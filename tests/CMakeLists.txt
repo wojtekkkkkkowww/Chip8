@@ -1,10 +1,10 @@
-add_executable(
-  hello_test
+add_executable( hello_test
   hello_test.cc
 )
-target_link_libraries(
-  hello_test
+target_link_libraries( hello_test
+PRIVATE
   GTest::gtest_main
+  Chip8
 )
 
 include(GoogleTest)

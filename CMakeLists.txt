@@ -2,19 +2,17 @@ cmake_minimum_required(VERSION 3.32)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
+set(PROJECT_FLAGS
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Wconversion
+    -Werror
+)
 
 add_compile_options(-std=c++20)
 
-if ( DEBUG )
-    add_compile_options(-g)
-    message("compiling in debug mode")
-else() 
-    # additional warnings
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-project(SlayBoy)
+project(Chip8)
 
 ## Adding the GoogleTest library to the project
 ## https://google.github.io/googletest/quickstart-cmake.html
