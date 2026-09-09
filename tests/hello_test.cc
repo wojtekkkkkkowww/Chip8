@@ -16,7 +16,7 @@ TEST(ScreenTest, ScreenInit) {
     MonoScreen screen;
 
     ASSERT_EQ(screen.get(0, 0), 0);
-
+    //
     screen.set(3, 4);
     ASSERT_EQ(screen.get(3, 4), 1);
 
@@ -130,15 +130,15 @@ class DrawSprite : public AssemblyCommand {
 
         for(size_t i = 0; i < rows_; i++) {
 
-            uint8_t spriteBite = data.ram[data.index_register + i];
+            uint8_t spriteByte = data.ram[data.index_register + i];
             uint8_t currentYpos = (yPos + i) % MonoScreen::HIGTH;
 
             for(size_t j = 0; j < 8; j++) {
 
-                uint8_t color = spriteBite & (0x1 << (7 - j));
                 uint8_t currentXpos = (xPos + j) % MonoScreen::WIDTH;
+                uint8_t color = spriteByte & (0x1 << (7 - j));
 
-                if(color == 1) {
+                if(color > 0) {
                     if(data.screen.get(currentXpos, currentYpos) == 1) {
                         data.common_registers[colisionRegister] = 1;
                         data.screen.reset(currentXpos, currentYpos);
@@ -231,12 +231,55 @@ TEST(MachineCode, ExecuteCommand) {
     ASSERT_EQ(data.index_register, 0x0111);
 }
 
+std::string readSprite(uint8_t xPos, uint8_t yPos, uint8_t rows, const MonoScreen &screen) {
+
+    std::string line{};
+    std::string sprite{};
+    std::stringstream ss{};
+    ss << screen;
+    size_t index{0};
+    while(std::getline(ss, line) and (std::count(sprite.begin(), sprite.end(), '\n') < rows)) {
+        if(index >= yPos) {
+            sprite.append(line.substr(xPos, 8));
+            sprite.push_back('\n');
+        }
+        index++;
+    }
+    return sprite;
+}
+
 TEST(MachineCode, DrawSprite) {
-    // deklaracja obrazka w ram
     Decoder decoder;
     ChipData data;
-    auto drawScreen = decoder.decode(0xD114);
+
+    // loading sprite to ram
+    data.index_register = 0;
+    data.ram[0] = 0x66;
+    data.ram[1] = 0x7E;
+    data.ram[2] = 0xC3;
+    data.ram[3] = 0x99;
+
+    // setup X and Y
+    uint8_t xPos = 1;
+    uint8_t yPos = 1;
+    data.common_registers[2] = xPos;
+    data.common_registers[3] = yPos;
+
+    auto drawScreen = decoder.decode(0xD234);
     drawScreen->execute(data);
-    // print obrazka
-    // sprawdzenie czy jest taki jak powinien
+
+    auto expectedSprite = "O##OO##O\nO######O\n##OOOO##\n#OO##OO#\n";
+    auto fetchedSprite = readSprite(xPos, yPos, 4, data.screen);
+
+    ASSERT_EQ(expectedSprite, fetchedSprite);
+    ASSERT_EQ(data.common_registers[0xF], 0);
+
+    // clear screen with the same sprite
+    drawScreen->execute(data);
+
+    expectedSprite = "OOOOOOOO\nOOOOOOOO\nOOOOOOOO\nOOOOOOOO\n";
+    fetchedSprite = readSprite(xPos, yPos, 4, data.screen);
+
+    ASSERT_EQ(expectedSprite, fetchedSprite);
+    ASSERT_EQ(data.common_registers[0xF], 1);
 }

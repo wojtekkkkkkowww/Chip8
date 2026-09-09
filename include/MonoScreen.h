@@ -30,15 +30,21 @@ class MonoScreen {
         screen[i + j * WIDTH] = 0;
     }
 
-    uint8_t get(size_t i, size_t j) {
+    uint8_t get(size_t i, size_t j) const {
         if(i >= WIDTH or j >= WIDTH) {
             throw std::out_of_range("screen coordinates out of bands");
         }
         return screen[i + j * WIDTH];
     }
-
-    /* skad wiediec gdzie jest poczatek sprita??
-    void drawSprite() {
-    }
-    */
 };
+
+std::ostream &operator<<(std::ostream &os, const MonoScreen &obj) {
+    // write obj to stream
+    for(size_t i = 0; i < MonoScreen::HIGTH; i++) {
+        for(size_t j = 0; j < MonoScreen::WIDTH; j++) {
+            os << ((obj.get(j, i) == 0) ? "O" : "#");
+        }
+        os << '\n';
+    }
+    return os;
+}
