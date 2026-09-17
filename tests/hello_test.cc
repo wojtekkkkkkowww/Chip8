@@ -29,15 +29,39 @@ enum class CommandName { ClearScreen,
                          SaveToRegister,
                          AddToRegister,
                          SaveToIndexRegister,
-                         DrawSprite };
+                         DrawSprite,
+                         TwoAdressInstruction
+};
 
 class AssemblyCommand {
   public:
     virtual void execute(ChipData &data) = 0;
     virtual CommandName getName() = 0;
     virtual ~AssemblyCommand() = default;
+    
+    static constexpr uint16_t FFF(uint16_t opcode){
+        return opcode & 0x0FFF;
+    }
+    static constexpr uint8_t FF(uint16_t opcode) {
+        return opcode & 0x00FF;
+    }
+    static constexpr uint8_t F(uint16_t opcode) {
+        return opcode & 0x000F;
+    }
+    // >> has biger prio than &
+    static constexpr uint8_t F000(uint16_t opcode) {
+        return (opcode & 0xF000) >> 12;
+    }
+    static constexpr uint8_t F00(uint16_t opcode) {
+        return (opcode & 0x0F00) >> 8;
+    }
+    static constexpr uint8_t F0(uint16_t opcode) {
+        return (opcode & 0x00F0) >> 4;
+    }
+
+
 };
-// dziedziczenie po klasach jest private musi byc public
+
 class ClearScreen : public AssemblyCommand {
   public:
     void execute(ChipData &data) override {
@@ -55,7 +79,7 @@ class JumpToAdress : public AssemblyCommand {
     uint16_t adress_{};
 
   public:
-    JumpToAdress(uint16_t adress) : adress_(adress) {}
+    JumpToAdress(uint16_t command) : adress_(FFF(command)) {}
     void execute(ChipData &data) override {
         data.program_counter = adress_;
     }
@@ -66,9 +90,8 @@ class SaveToRegister : public AssemblyCommand {
   private:
     uint8_t register_{};
     uint8_t value_{};
-
   public:
-    SaveToRegister(uint8_t reg, uint8_t value) : register_(reg), value_(value) {
+    SaveToRegister(uint16_t command) : register_(F00(command)), value_(FF(command)) {
     }
 
     void execute(ChipData &data) override {
@@ -83,7 +106,7 @@ class SaveToIndexRegister : public AssemblyCommand {
     uint16_t value_{};
 
   public:
-    SaveToIndexRegister(uint16_t value) : value_(value) {
+    SaveToIndexRegister(uint16_t command) : value_(FFF(command)) {
     }
 
     void execute(ChipData &data) override {
@@ -99,7 +122,7 @@ class AddToRegister : public AssemblyCommand {
     uint8_t value_{};
 
   public:
-    AddToRegister(uint8_t reg, uint8_t value) : register_(reg), value_(value) {
+    AddToRegister(uint16_t command) : register_(F00(command)), value_(FF(command)) {
     }
 
     void execute(ChipData &data) override {
@@ -116,7 +139,7 @@ class DrawSprite : public AssemblyCommand {
     uint8_t rows_{};
 
   public:
-    DrawSprite(uint8_t xReg, uint8_t yReg, uint8_t rows) : xReg_(xReg), yReg_(yReg), rows_(rows) {
+    DrawSprite(uint16_t command) : xReg_(F00(command)), yReg_(F0(command)), rows_(F(command)) {
     }
 
     void execute(ChipData &data) override {
@@ -153,23 +176,97 @@ class DrawSprite : public AssemblyCommand {
     CommandName getName() override { return CommandName::DrawSprite; }
 };
 
+class TwoAdressInstruction : public AssemblyCommand{
+  private:
+    uint8_t xReg_{};
+    uint8_t yReg_{};
+    uint8_t operationType_{};
+  public:
+    TwoAdressInstruction(uint16_t command) : xReg_(F00(command)), yReg_(F0(command)), operationType_(F(command)) {
+    }
+    void execute(ChipData &data) override {
+        auto &xVal = data.common_registers[xReg_];
+        auto &yVal = data.common_registers[yReg_];
+        auto &fV = data.common_registers[0xF];
+
+        switch(operationType_) {
+        case 0:
+            xVal = yVal;
+            break;
+
+        case 1:
+            xVal |= yVal;
+            break;
+
+        case 2:
+            xVal &= yVal;
+            break;
+
+        case 3:
+            xVal ^= yVal;
+            break;
+
+        case 4: {
+            const uint16_t sum = xVal + yVal;
+            xVal = static_cast<uint8_t>(sum);
+            fV = sum > 0xFF;
+            break;
+        }
+
+        case 5: {
+            const uint8_t flag = xVal >= yVal;
+            xVal -= yVal;
+            fV = flag;
+            break;
+        }
+
+        case 6: {
+            const uint8_t value = yVal;
+            const uint8_t flag = value & 0x1;
+            xVal = (value >> 1);
+            fV = flag;
+            break;
+        }
+
+        case 7: {
+            const uint8_t flag = yVal >= xVal;
+            xVal = yVal - xVal;
+            fV = flag;
+            break;
+        }
+
+        case 0xE: {
+            const uint8_t value = yVal;
+            const uint8_t flag = (value >> 7) & 0x1;
+            xVal = static_cast<uint8_t>((value << 1));
+            fV = flag;
+            break;
+        }
+        }
+    }
+    CommandName getName() override { return CommandName::TwoAdressInstruction; }
+};
+
 class Decoder {
   public:
     std::unique_ptr<AssemblyCommand> decode(uint16_t command) {
         auto choseCommand = [command]() -> std::optional<std::unique_ptr<AssemblyCommand>> {
             switch(command & 0xF000) {
-            case 0x1000:
-                return std::make_unique<JumpToAdress>(command & 0x0FFF);
+           
             case 0x0000:
                 return std::make_unique<ClearScreen>();
+            case 0x1000:
+                return std::make_unique<JumpToAdress>(command);
             case 0x6000:
-                return std::make_unique<SaveToRegister>((command & 0x0F00) >> 8, command & 0x00FF);
+                return std::make_unique<SaveToRegister>(command);
             case 0x7000:
-                return std::make_unique<AddToRegister>((command & 0x0F00) >> 8, command & 0x00FF);
+                return std::make_unique<AddToRegister>(command);
+            case 0x8000:
+                return std::make_unique<TwoAdressInstruction>(command);    
             case 0xA000:
-                return std::make_unique<SaveToIndexRegister>(command & 0x0FFF);
+                return std::make_unique<SaveToIndexRegister>(command);
             case 0xD000:
-                return std::make_unique<DrawSprite>((command & 0x0F00) >> 8, (command & 0x00F0) >> 4, (command & 0x000F));
+                return std::make_unique<DrawSprite>(command);
             }
             return std::nullopt;
         };
@@ -203,6 +300,9 @@ TEST(MachineCode, DecodingTest) {
 
     auto command6 = decoder.decode(0xD111);
     ASSERT_EQ(command6->getName(), CommandName::DrawSprite);
+
+    auto command7 = decoder.decode(0x8000);
+    ASSERT_EQ(command7->getName(), CommandName::TwoAdressInstruction);
 }
 
 TEST(MachineCode, ExecuteCommand) {
@@ -282,4 +382,18 @@ TEST(MachineCode, DrawSprite) {
 
     ASSERT_EQ(expectedSprite, fetchedSprite);
     ASSERT_EQ(data.common_registers[0xF], 1);
+}
+
+
+TEST(MachineCode, TestTwoAdressInstruction) {
+    ChipData data;
+    Decoder decoder;
+
+    data.common_registers[1] = 3;
+    data.common_registers[2] = 4;
+    auto sub = decoder.decode(0x8125);
+    sub->execute(data);
+    ASSERT_EQ(data.common_registers[1], 0xFF);
+    ASSERT_EQ(data.common_registers[0xF], 0);
+
 }
