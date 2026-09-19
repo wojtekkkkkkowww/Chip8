@@ -1,15 +1,35 @@
+#include <algorithm>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <optional>
 
 #include "MonoScreen.h"
 #include <array>
+#include <stdexcept>
 
 struct ChipData {
-    std::array<uint8_t, 4096> ram;
-    std::array<uint8_t, 16> common_registers;
+    std::array<uint8_t, 4096> ram{};
+    std::array<uint8_t, 16> common_registers{};
     uint16_t index_register{};
     uint16_t program_counter{};
     MonoScreen screen;
+};
+
+enum class SpriteColisionType { Clipping,
+                                Wrapping };
+
+struct Config {
+    SpriteColisionType colisionType{SpriteColisionType::Clipping};
+};
+
+class ConfigStorage {
+  private:
+    inline static Config config{};
+    ConfigStorage() = delete;
+
+  public:
+    static void SetConfig(Config config_) { config = config_; };
+    static Config getConfig() { return config; };
 };
 
 TEST(ScreenTest, ScreenInit) {
@@ -24,13 +44,14 @@ TEST(ScreenTest, ScreenInit) {
     ASSERT_EQ(screen.get(3, 4), 0);
 }
 
-enum class CommandName { ClearScreen,
-                         JumpToAdress,
-                         SaveToRegister,
-                         AddToRegister,
-                         SaveToIndexRegister,
-                         DrawSprite,
-                         TwoAdressInstruction
+enum class CommandName {
+    ClearScreen,
+    JumpToAdress,
+    SaveToRegister,
+    AddToRegister,
+    SaveToIndexRegister,
+    DrawSprite,
+    TwoAdressInstruction
 };
 
 class AssemblyCommand {
@@ -38,35 +59,31 @@ class AssemblyCommand {
     virtual void execute(ChipData &data) = 0;
     virtual CommandName getName() = 0;
     virtual ~AssemblyCommand() = default;
-    
-    static constexpr uint16_t FFF(uint16_t opcode){
-        return opcode & 0x0FFF;
-    }
+
+    static constexpr uint16_t FFF(uint16_t opcode) { return opcode & 0x0FFF; }
     static constexpr uint8_t FF(uint16_t opcode) {
-        return opcode & 0x00FF;
+        return static_cast<uint8_t>(opcode & 0x00FF);
     }
     static constexpr uint8_t F(uint16_t opcode) {
-        return opcode & 0x000F;
+        return static_cast<uint8_t>(opcode & 0x000F);
     }
     // >> has biger prio than &
     static constexpr uint8_t F000(uint16_t opcode) {
-        return (opcode & 0xF000) >> 12;
+        return static_cast<uint8_t>((opcode & 0xF000) >> 12);
     }
     static constexpr uint8_t F00(uint16_t opcode) {
-        return (opcode & 0x0F00) >> 8;
+        return static_cast<uint8_t>((opcode & 0x0F00) >> 8);
     }
     static constexpr uint8_t F0(uint16_t opcode) {
-        return (opcode & 0x00F0) >> 4;
+        return static_cast<uint8_t>((opcode & 0x00F0) >> 4);
     }
-
-
 };
 
 class ClearScreen : public AssemblyCommand {
   public:
     void execute(ChipData &data) override {
         for(size_t i = 0; i < MonoScreen::WIDTH; i++) {
-            for(size_t j = 0; j < MonoScreen::WIDTH; j++) {
+            for(size_t j = 0; j < MonoScreen::HIGTH; j++) {
                 data.screen.reset(i, j);
             }
         }
@@ -80,9 +97,7 @@ class JumpToAdress : public AssemblyCommand {
 
   public:
     JumpToAdress(uint16_t command) : adress_(FFF(command)) {}
-    void execute(ChipData &data) override {
-        data.program_counter = adress_;
-    }
+    void execute(ChipData &data) override { data.program_counter = adress_; }
     CommandName getName() override { return CommandName::JumpToAdress; }
 };
 
@@ -90,9 +105,10 @@ class SaveToRegister : public AssemblyCommand {
   private:
     uint8_t register_{};
     uint8_t value_{};
+
   public:
-    SaveToRegister(uint16_t command) : register_(F00(command)), value_(FF(command)) {
-    }
+    SaveToRegister(uint16_t command)
+        : register_(F00(command)), value_(FF(command)) {}
 
     void execute(ChipData &data) override {
         data.common_registers[register_] = value_;
@@ -106,12 +122,9 @@ class SaveToIndexRegister : public AssemblyCommand {
     uint16_t value_{};
 
   public:
-    SaveToIndexRegister(uint16_t command) : value_(FFF(command)) {
-    }
+    SaveToIndexRegister(uint16_t command) : value_(FFF(command)) {}
 
-    void execute(ChipData &data) override {
-        data.index_register = value_;
-    }
+    void execute(ChipData &data) override { data.index_register = value_; }
 
     CommandName getName() override { return CommandName::SaveToIndexRegister; }
 };
@@ -122,8 +135,8 @@ class AddToRegister : public AssemblyCommand {
     uint8_t value_{};
 
   public:
-    AddToRegister(uint16_t command) : register_(F00(command)), value_(FF(command)) {
-    }
+    AddToRegister(uint16_t command)
+        : register_(F00(command)), value_(FF(command)) {}
 
     void execute(ChipData &data) override {
         data.common_registers[register_] += value_;
@@ -138,9 +151,24 @@ class DrawSprite : public AssemblyCommand {
     uint8_t yReg_{};
     uint8_t rows_{};
 
-  public:
-    DrawSprite(uint16_t command) : xReg_(F00(command)), yReg_(F0(command)), rows_(F(command)) {
+    template <uint8_t size>
+    std::optional<uint8_t> newPos(uint8_t pos, uint8_t offset) {
+
+        uint8_t next = pos + offset;
+        switch(ConfigStorage::getConfig().colisionType) {
+        case SpriteColisionType::Wrapping:
+            return next % size;
+        case SpriteColisionType::Clipping:
+            if(next >= size)
+                return std::nullopt;
+            return next;
+        }
+        throw std::logic_error("Unknown SpriteColisionType");
     }
+
+  public:
+    DrawSprite(uint16_t command)
+        : xReg_(F00(command)), yReg_(F0(command)), rows_(F(command)) {}
 
     void execute(ChipData &data) override {
 
@@ -151,22 +179,29 @@ class DrawSprite : public AssemblyCommand {
 
         data.common_registers[colisionRegister] = 0;
 
-        for(size_t i = 0; i < rows_; i++) {
+        for(uint8_t i = 0; i < rows_; i++) {
 
-            uint8_t spriteByte = data.ram[data.index_register + i];
-            uint8_t currentYpos = (yPos + i) % MonoScreen::HIGTH;
+            uint8_t spriteByte = data.ram.at(data.index_register + i);
+            auto currentYpos = newPos<MonoScreen::HIGTH>(yPos, i);
 
-            for(size_t j = 0; j < 8; j++) {
+            if(not currentYpos)
+                continue;
 
-                uint8_t currentXpos = (xPos + j) % MonoScreen::WIDTH;
+            for(uint8_t j = 0; j < 8; j++) {
+
+                auto currentXpos = newPos<MonoScreen::WIDTH>(xPos, j);
+
+                if(not currentXpos)
+                    continue;
+
                 uint8_t color = spriteByte & (0x1 << (7 - j));
 
                 if(color > 0) {
-                    if(data.screen.get(currentXpos, currentYpos) == 1) {
+                    if(data.screen.get(*currentXpos, *currentYpos) == 1) {
                         data.common_registers[colisionRegister] = 1;
-                        data.screen.reset(currentXpos, currentYpos);
+                        data.screen.reset(*currentXpos, *currentYpos);
                     } else {
-                        data.screen.set(currentXpos, currentYpos);
+                        data.screen.set(*currentXpos, *currentYpos);
                     }
                 }
             }
@@ -176,14 +211,15 @@ class DrawSprite : public AssemblyCommand {
     CommandName getName() override { return CommandName::DrawSprite; }
 };
 
-class TwoAdressInstruction : public AssemblyCommand{
+class TwoAdressInstruction : public AssemblyCommand {
   private:
     uint8_t xReg_{};
     uint8_t yReg_{};
     uint8_t operationType_{};
+
   public:
-    TwoAdressInstruction(uint16_t command) : xReg_(F00(command)), yReg_(F0(command)), operationType_(F(command)) {
-    }
+    TwoAdressInstruction(uint16_t command)
+        : xReg_(F00(command)), yReg_(F0(command)), operationType_(F(command)) {}
     void execute(ChipData &data) override {
         auto &xVal = data.common_registers[xReg_];
         auto &yVal = data.common_registers[yReg_];
@@ -196,14 +232,17 @@ class TwoAdressInstruction : public AssemblyCommand{
 
         case 1:
             xVal |= yVal;
+            fV = 0; // COSMAC based variants resets fv
             break;
 
         case 2:
             xVal &= yVal;
+            fV = 0;
             break;
 
         case 3:
             xVal ^= yVal;
+            fV = 0;
             break;
 
         case 4: {
@@ -227,7 +266,6 @@ class TwoAdressInstruction : public AssemblyCommand{
             fV = flag;
             break;
         }
-
         case 7: {
             const uint8_t flag = yVal >= xVal;
             xVal = yVal - xVal;
@@ -242,6 +280,9 @@ class TwoAdressInstruction : public AssemblyCommand{
             fV = flag;
             break;
         }
+        default: {
+            throw std::logic_error("Unknown operation");
+        }
         }
     }
     CommandName getName() override { return CommandName::TwoAdressInstruction; }
@@ -250,34 +291,24 @@ class TwoAdressInstruction : public AssemblyCommand{
 class Decoder {
   public:
     std::unique_ptr<AssemblyCommand> decode(uint16_t command) {
-        auto choseCommand = [command]() -> std::optional<std::unique_ptr<AssemblyCommand>> {
-            switch(command & 0xF000) {
-           
-            case 0x0000:
-                return std::make_unique<ClearScreen>();
-            case 0x1000:
-                return std::make_unique<JumpToAdress>(command);
-            case 0x6000:
-                return std::make_unique<SaveToRegister>(command);
-            case 0x7000:
-                return std::make_unique<AddToRegister>(command);
-            case 0x8000:
-                return std::make_unique<TwoAdressInstruction>(command);    
-            case 0xA000:
-                return std::make_unique<SaveToIndexRegister>(command);
-            case 0xD000:
-                return std::make_unique<DrawSprite>(command);
-            }
-            return std::nullopt;
-        };
-
-        auto assemblyCommand = choseCommand();
-        if(not assemblyCommand.value()) {
-
-            throw std::runtime_error("Unknown Chip-8 opcode");
+        switch(command & 0xF000) {
+        case 0x0000:
+            return std::make_unique<ClearScreen>();
+        case 0x1000:
+            return std::make_unique<JumpToAdress>(command);
+        case 0x6000:
+            return std::make_unique<SaveToRegister>(command);
+        case 0x7000:
+            return std::make_unique<AddToRegister>(command);
+        case 0x8000:
+            return std::make_unique<TwoAdressInstruction>(command);
+        case 0xA000:
+            return std::make_unique<SaveToIndexRegister>(command);
+        case 0xD000:
+            return std::make_unique<DrawSprite>(command);
         }
 
-        return std::move(assemblyCommand.value());
+        throw std::runtime_error("Unknown Chip-8 opcode");
     }
 };
 
@@ -331,14 +362,16 @@ TEST(MachineCode, ExecuteCommand) {
     ASSERT_EQ(data.index_register, 0x0111);
 }
 
-std::string readSprite(uint8_t xPos, uint8_t yPos, uint8_t rows, const MonoScreen &screen) {
+std::string readSprite(uint8_t xPos, uint8_t yPos, uint8_t rows,
+                       const MonoScreen &screen) {
 
     std::string line{};
     std::string sprite{};
     std::stringstream ss{};
     ss << screen;
     size_t index{0};
-    while(std::getline(ss, line) and (std::count(sprite.begin(), sprite.end(), '\n') < rows)) {
+    while(std::getline(ss, line) and
+          (std::count(sprite.begin(), sprite.end(), '\n') < rows)) {
         if(index >= yPos) {
             sprite.append(line.substr(xPos, 8));
             sprite.push_back('\n');
@@ -384,16 +417,57 @@ TEST(MachineCode, DrawSprite) {
     ASSERT_EQ(data.common_registers[0xF], 1);
 }
 
+struct TwoAdressTestCase {
+    const char *name;
+    uint16_t opcode;
+    uint8_t x;
+    uint8_t y;
+    uint8_t initialFlag;
+    uint8_t expectedX;
+    uint8_t expectedFlag;
+};
 
-TEST(MachineCode, TestTwoAdressInstruction) {
-    ChipData data;
+class TwoAdressInstructionTest
+    : public testing::TestWithParam<TwoAdressTestCase> {};
+
+TEST_P(TwoAdressInstructionTest, ExecuteCommand) {
+    const auto &testCase = GetParam();
+    ChipData data{};
     Decoder decoder;
+    data.common_registers[1] = testCase.x;
+    data.common_registers[2] = testCase.y;
+    data.common_registers[0xF] = testCase.initialFlag;
 
-    data.common_registers[1] = 3;
-    data.common_registers[2] = 4;
-    auto sub = decoder.decode(0x8125);
-    sub->execute(data);
-    ASSERT_EQ(data.common_registers[1], 0xFF);
-    ASSERT_EQ(data.common_registers[0xF], 0);
+    auto command = decoder.decode(testCase.opcode);
+    command->execute(data);
 
+    ASSERT_EQ(data.common_registers[1], testCase.expectedX);
+    ASSERT_EQ(data.common_registers[2], testCase.y);
+    ASSERT_EQ(data.common_registers[0xF], testCase.expectedFlag);
 }
+
+const TwoAdressTestCase twoAdressCases[] = {
+    {"Copy", 0x8120, 0xAA, 0x55, 1, 0x55, 1},
+    {"Or", 0x8121, 0xA5, 0x3C, 1, 0xBD, 0},
+    {"And", 0x8122, 0xA5, 0x3C, 1, 0x24, 0},
+    {"Xor", 0x8123, 0xA5, 0x3C, 1, 0x99, 0},
+    {"AddWithoutCarry", 0x8124, 3, 4, 1, 7, 0},
+    {"AddAtByteLimit", 0x8124, 0xFE, 1, 1, 0xFF, 0},
+    {"AddWithCarry", 0x8124, 0xFF, 1, 0, 0, 1},
+    {"SubtractWithBorrow", 0x8125, 3, 4, 1, 0xFF, 0},
+    {"SubtractWithoutBorrow", 0x8125, 4, 3, 0, 1, 1},
+    {"SubtractEqualValues", 0x8125, 4, 4, 0, 0, 1},
+    {"ShiftRightWithLowBitClear", 0x8126, 0xFF, 4, 1, 2, 0},
+    {"ShiftRightWithLowBitSet", 0x8126, 0, 5, 0, 2, 1},
+    {"ReverseSubtractWithoutBorrow", 0x8127, 3, 4, 0, 1, 1},
+    {"ReverseSubtractWithBorrow", 0x8127, 4, 3, 1, 0xFF, 0},
+    {"ReverseSubtractEqualValues", 0x8127, 4, 4, 0, 0, 1},
+    {"ShiftLeftWithHighBitClear", 0x812E, 0xFF, 0x41, 1, 0x82, 0},
+    {"ShiftLeftWithHighBitSet", 0x812E, 0, 0x81, 0, 2, 1},
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    MachineCode, TwoAdressInstructionTest, testing::ValuesIn(twoAdressCases),
+    [](const testing::TestParamInfo<TwoAdressTestCase> &info) {
+        return std::string(info.param.name);
+    });
