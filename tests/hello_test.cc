@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <optional>
+#include <sstream>
 
 #include "MonoScreen.h"
 #include <array>
@@ -51,7 +52,27 @@ enum class CommandName {
     AddToRegister,
     SaveToIndexRegister,
     DrawSprite,
-    TwoAdressInstruction
+    TwoAdressInstruction,
+    CallNativeRoutine,
+    ReturnFromSubroutine,
+    CallSubroutine,
+    SkipIfEqualToValue,
+    SkipIfNotEqualToValue,
+    SkipIfRegistersEqual,
+    SkipIfRegistersNotEqual,
+    JumpWithOffset,
+    RandomWithMask,
+    SkipIfKeyPressed,
+    SkipIfKeyNotPressed,
+    ReadDelayTimer,
+    WaitForKey,
+    SetDelayTimer,
+    SetSoundTimer,
+    AddToIndexRegister,
+    SetIndexToFontSprite,
+    StoreBinaryCodedDecimal,
+    StoreRegisters,
+    LoadRegisters
 };
 
 class AssemblyCommand {
@@ -312,29 +333,66 @@ class Decoder {
     }
 };
 
-TEST(MachineCode, DecodingTest) {
+struct DecodingTestCase {
+    uint16_t opcode;
+    CommandName expectedName;
+};
+
+class DecodingTest : public testing::TestWithParam<DecodingTestCase> {};
+
+TEST_P(DecodingTest, RecognizesCommand) {
+    const auto &testCase = GetParam();
     Decoder decoder;
-    auto command = decoder.decode(0x00E0);
-    ASSERT_EQ(command->getName(), CommandName::ClearScreen);
-
-    auto command2 = decoder.decode(0x1111);
-    ASSERT_EQ(command2->getName(), CommandName::JumpToAdress);
-
-    auto command3 = decoder.decode(0x6111);
-    ASSERT_EQ(command3->getName(), CommandName::SaveToRegister);
-
-    auto command4 = decoder.decode(0x7111);
-    ASSERT_EQ(command4->getName(), CommandName::AddToRegister);
-
-    auto command5 = decoder.decode(0xA111);
-    ASSERT_EQ(command5->getName(), CommandName::SaveToIndexRegister);
-
-    auto command6 = decoder.decode(0xD111);
-    ASSERT_EQ(command6->getName(), CommandName::DrawSprite);
-
-    auto command7 = decoder.decode(0x8000);
-    ASSERT_EQ(command7->getName(), CommandName::TwoAdressInstruction);
+    auto command = decoder.decode(testCase.opcode);
+    ASSERT_NE(command, nullptr);
+    EXPECT_EQ(command->getName(), testCase.expectedName);
 }
+
+constexpr auto decodingCases = std::to_array<DecodingTestCase>({
+    {0x0123, CommandName::CallNativeRoutine},
+    {0x00E0, CommandName::ClearScreen},
+    {0x00EE, CommandName::ReturnFromSubroutine},
+    {0x1111, CommandName::JumpToAdress},
+    {0x2111, CommandName::CallSubroutine},
+    {0x31AB, CommandName::SkipIfEqualToValue},
+    {0x41AB, CommandName::SkipIfNotEqualToValue},
+    {0x5120, CommandName::SkipIfRegistersEqual},
+    {0x6111, CommandName::SaveToRegister},
+    {0x7111, CommandName::AddToRegister},
+    {0x8120, CommandName::TwoAdressInstruction},
+    {0x8121, CommandName::TwoAdressInstruction},
+    {0x8122, CommandName::TwoAdressInstruction},
+    {0x8123, CommandName::TwoAdressInstruction},
+    {0x8124, CommandName::TwoAdressInstruction},
+    {0x8125, CommandName::TwoAdressInstruction},
+    {0x8126, CommandName::TwoAdressInstruction},
+    {0x8127, CommandName::TwoAdressInstruction},
+    {0x812E, CommandName::TwoAdressInstruction},
+    {0x9120, CommandName::SkipIfRegistersNotEqual},
+    {0xA111, CommandName::SaveToIndexRegister},
+    {0xB123, CommandName::JumpWithOffset},
+    {0xC1AB, CommandName::RandomWithMask},
+    {0xD123, CommandName::DrawSprite},
+    {0xE19E, CommandName::SkipIfKeyPressed},
+    {0xE1A1, CommandName::SkipIfKeyNotPressed},
+    {0xF107, CommandName::ReadDelayTimer},
+    {0xF10A, CommandName::WaitForKey},
+    {0xF115, CommandName::SetDelayTimer},
+    {0xF118, CommandName::SetSoundTimer},
+    {0xF11E, CommandName::AddToIndexRegister},
+    {0xF129, CommandName::SetIndexToFontSprite},
+    {0xF133, CommandName::StoreBinaryCodedDecimal},
+    {0xF155, CommandName::StoreRegisters},
+    {0xF165, CommandName::LoadRegisters},
+});
+
+INSTANTIATE_TEST_SUITE_P(
+    MachineCode, DecodingTest, testing::ValuesIn(decodingCases),
+    [](const auto &info) {
+        std::ostringstream name;
+        name << "Opcode" << std::hex << info.param.opcode;
+        return name.str();
+    });
 
 TEST(MachineCode, ExecuteCommand) {
     Decoder decoder;
@@ -418,7 +476,7 @@ TEST(MachineCode, DrawSprite) {
 }
 
 struct TwoAdressTestCase {
-    const char *name;
+    std::string_view name;
     uint16_t opcode;
     uint8_t x;
     uint8_t y;
@@ -446,7 +504,7 @@ TEST_P(TwoAdressInstructionTest, ExecuteCommand) {
     ASSERT_EQ(data.common_registers[0xF], testCase.expectedFlag);
 }
 
-const TwoAdressTestCase twoAdressCases[] = {
+constexpr auto twoAdressCases = std::to_array<TwoAdressTestCase>({
     {"Copy", 0x8120, 0xAA, 0x55, 1, 0x55, 1},
     {"Or", 0x8121, 0xA5, 0x3C, 1, 0xBD, 0},
     {"And", 0x8122, 0xA5, 0x3C, 1, 0x24, 0},
@@ -464,10 +522,10 @@ const TwoAdressTestCase twoAdressCases[] = {
     {"ReverseSubtractEqualValues", 0x8127, 4, 4, 0, 0, 1},
     {"ShiftLeftWithHighBitClear", 0x812E, 0xFF, 0x41, 1, 0x82, 0},
     {"ShiftLeftWithHighBitSet", 0x812E, 0, 0x81, 0, 2, 1},
-};
+});
 
 INSTANTIATE_TEST_SUITE_P(
     MachineCode, TwoAdressInstructionTest, testing::ValuesIn(twoAdressCases),
-    [](const testing::TestParamInfo<TwoAdressTestCase> &info) {
+    [](const auto &info) {
         return std::string(info.param.name);
     });
