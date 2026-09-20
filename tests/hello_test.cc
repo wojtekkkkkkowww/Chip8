@@ -66,15 +66,15 @@ enum class CommandName {
     SkipIfRegistersNotEqual, //+
     JumpWithOffset,
     RandomWithMask,
-    SkipIfKeyPressed,
-    SkipIfKeyNotPressed,
+    SkipIfKeyPressed, //+
+    SkipIfKeyNotPressed, //+
     ReadDelayTimer,
     WaitForKey,
     SetDelayTimer,
     SetSoundTimer,
-    AddToIndexRegister,
+    AddToIndexRegister, // +
     SetIndexToFontSprite,
-    StoreBinaryCodedDecimal,
+    StoreBinaryCodedDecimal, // +
     StoreRegisters,
     LoadRegisters
 };
@@ -202,6 +202,33 @@ class SaveToIndexRegister {
     SaveToIndexRegister(uint16_t command) : value_(Opcode::FFF(command)) {}
 
     void execute(ChipData &data) { data.index_register = value_; }
+};
+
+class AddToIndexRegister {
+  private:
+    uint8_t register_{};
+
+  public:
+    AddToIndexRegister(uint16_t command) : register_(Opcode::F00(command)) {}
+
+    void execute(ChipData &data) {
+        data.index_register += data.common_registers[register_];
+    }
+};
+
+class StoreBinaryCodedDecimal {
+  private:
+    uint8_t register_{};
+
+  public:
+    StoreBinaryCodedDecimal(uint16_t command) : register_(Opcode::F00(command)) {}
+
+    void execute(ChipData &data) {
+        const uint8_t value = data.common_registers[register_];
+        data.ram[data.index_register] = value / 100;
+        data.ram[data.index_register + 1] = (value / 10) % 10;
+        data.ram[data.index_register + 2] = value % 10;
+    }
 };
 
 class AddToRegister {
@@ -364,7 +391,8 @@ class AssemblyCommand {
   private:
     using Storage = std::variant<ClearScreen, JumpToAdress, SaveToRegister,
                                  AddToRegister, SaveToIndexRegister, DrawSprite,
-                                 TwoAdressInstruction, SkipIf>;
+                                 TwoAdressInstruction, SkipIf, AddToIndexRegister,
+                                 StoreBinaryCodedDecimal>;
     Storage instruction_;
 
   public:
@@ -425,6 +453,12 @@ class Decoder {
                 return AssemblyCommand{
                     SkipIf{command, SkipCondition::KeyNotPressed}};
             break;
+        case 0xF000:
+            if(Opcode::FF(command) == 0x1E)
+                return AssemblyCommand{AddToIndexRegister{command}};
+            if(Opcode::FF(command) == 0x33)
+                return AssemblyCommand{StoreBinaryCodedDecimal{command}};
+            break;
         }
 
         throw std::runtime_error("Unknown Chip-8 opcode");
@@ -473,6 +507,8 @@ const auto decodingCases = std::to_array<DecodingTestCase>({
     {0x812E, matchesCommand<TwoAdressInstruction>},
     {0xA111, matchesCommand<SaveToIndexRegister>},
     {0xD123, matchesCommand<DrawSprite>},
+    {0xF31E, matchesCommand<AddToIndexRegister>},
+    {0xF533, matchesCommand<StoreBinaryCodedDecimal>},
 });
 
 INSTANTIATE_TEST_SUITE_P(
@@ -507,7 +543,52 @@ TEST(MachineCode, ExecuteCommand) {
     auto saveToIndexRegister = decoder.decode(0xA111);
     saveToIndexRegister.execute(data);
     ASSERT_EQ(data.index_register, 0x0111);
+
+    auto addToIndexRegister = decoder.decode(0xF11E);
+    addToIndexRegister.execute(data);
+    ASSERT_EQ(data.index_register, 0x0133);
+    ASSERT_EQ(data.common_registers[0x01], 0x0022);
 }
+
+struct BinaryCodedDecimalTestCase {
+    uint8_t value;
+    std::array<uint8_t, 3> digits;
+};
+
+class StoreBinaryCodedDecimalTest
+    : public testing::TestWithParam<BinaryCodedDecimalTestCase> {};
+
+TEST_P(StoreBinaryCodedDecimalTest, ExecuteCommand) {
+    const auto &testCase = GetParam();
+    ChipData data{};
+    Decoder decoder;
+    data.index_register = 0x300;
+    data.common_registers[5] = testCase.value;
+    data.ram.fill(0xAA);
+
+    auto command = decoder.decode(0xF533);
+    command.execute(data);
+
+    for(size_t i = 0; i < testCase.digits.size(); ++i)
+        EXPECT_EQ(data.ram[0x300 + i], testCase.digits[i]);
+    EXPECT_EQ(data.ram[0x2FF], 0xAA);
+    EXPECT_EQ(data.ram[0x303], 0xAA);
+    EXPECT_EQ(data.index_register, 0x300);
+    EXPECT_EQ(data.common_registers[5], testCase.value);
+}
+
+constexpr auto binaryCodedDecimalCases =
+    std::to_array<BinaryCodedDecimalTestCase>({
+        {0, {0, 0, 0}},
+        {7, {0, 0, 7}},
+        {42, {0, 4, 2}},
+        {100, {1, 0, 0}},
+        {255, {2, 5, 5}},
+    });
+
+INSTANTIATE_TEST_SUITE_P(
+    MachineCode, StoreBinaryCodedDecimalTest,
+    testing::ValuesIn(binaryCodedDecimalCases));
 
 struct RegistersData {
     uint8_t x;
