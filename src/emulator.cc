@@ -1,14 +1,14 @@
 #include <iostream>
 #include <string_view>
 
-void skibidi(auto sigma1, auto sigma2) {
-    sigma1();
-    sigma2();
+void runCallbacks(auto firstCallback, auto secondCallback) {
+    firstCallback();
+    secondCallback();
 }
 
 int main() {
-    std::string_view sigma{"sigma\n"};
-    skibidi([]() {}, [sigma]() { std::cout << sigma; });
+    std::string_view message{"sigma\n"};
+    runCallbacks([]() {}, [message]() { std::cout << message; });
 
     return 0;
 }

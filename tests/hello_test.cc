@@ -12,18 +12,18 @@
 
 struct ChipData {
     std::array<uint8_t, 4096> ram{};
-    std::array<uint8_t, 16> common_registers{};
+    std::array<uint8_t, 16> commonRegisters{};
     std::array<uint8_t, 16> keyboard{};
-    uint16_t index_register{};
-    uint16_t program_counter{};
+    uint16_t indexRegister{};
+    uint16_t programCounter{};
     MonoScreen screen;
 };
 
-enum class SpriteColisionType { Clipping,
+enum class SpriteCollisionType { Clipping,
                                 Wrapping };
 
 struct Config {
-    SpriteColisionType colisionType{SpriteColisionType::Clipping};
+    SpriteCollisionType collisionType{SpriteCollisionType::Clipping};
 };
 
 class ConfigStorage {
@@ -32,7 +32,7 @@ class ConfigStorage {
     ConfigStorage() = delete;
 
   public:
-    static void SetConfig(Config config_) { config = config_; };
+    static void SetConfig(Config newConfig) { config = newConfig; };
     static Config getConfig() { return config; };
 };
 
@@ -51,12 +51,12 @@ TEST(ScreenTest, ScreenInit) {
 /*
 enum class CommandName {
     ClearScreen, // +
-    JumpToAdress, // +
+    JumpToAddress, // +
     SaveToRegister, // +
     AddToRegister, // +
     SaveToIndexRegister, // +
     DrawSprite, // +
-    TwoAdressInstruction, // +
+    TwoAddressInstruction, // +
     CallNativeRoutine,
     ReturnFromSubroutine,
     CallSubroutine,
@@ -88,7 +88,7 @@ static constexpr uint8_t FF(uint16_t opcode) {
 static constexpr uint8_t F(uint16_t opcode) {
     return static_cast<uint8_t>(opcode & 0x000F);
 }
-// >> has biger prio than &
+// >> has higher precedence than &
 // static constexpr uint8_t F000(uint16_t opcode) {
 //    return static_cast<uint8_t>((opcode & 0xF000) >> 12);
 //}
@@ -111,43 +111,43 @@ enum class SkipCondition {
 
 class SkipIf {
   private:
-    SkipCondition condition_{};
-    uint16_t opcode_;
+    SkipCondition condition{};
+    uint16_t opcode;
 
   public:
-    SkipIf(uint16_t opcode, SkipCondition condition)
-        : condition_(condition), opcode_(opcode) {}
+    SkipIf(uint16_t rawOpcode, SkipCondition skipCondition)
+        : condition(skipCondition), opcode(rawOpcode) {}
     void execute(ChipData &data) {
         bool conditionSatisfied = [this, &data]() {
-            switch(condition_) {
+            switch(condition) {
             case SkipCondition::EqualToValue: {
-                uint8_t regX = Opcode::F00(opcode_);
-                uint8_t number = Opcode::FF(opcode_);
-                return data.common_registers[regX] == number;
+                uint8_t xRegisterIndex = Opcode::F00(opcode);
+                uint8_t value = Opcode::FF(opcode);
+                return data.commonRegisters[xRegisterIndex] == value;
             }
             case SkipCondition::NotEqualToValue: {
-                uint8_t regX = Opcode::F00(opcode_);
-                uint8_t number = Opcode::FF(opcode_);
-                return data.common_registers[regX] != number;
+                uint8_t xRegisterIndex = Opcode::F00(opcode);
+                uint8_t value = Opcode::FF(opcode);
+                return data.commonRegisters[xRegisterIndex] != value;
             }
             case SkipCondition::RegistersEqual: {
-                uint8_t regX = Opcode::F00(opcode_);
-                uint8_t regY = Opcode::F0(opcode_);
-                return data.common_registers[regX] == data.common_registers[regY];
+                uint8_t xRegisterIndex = Opcode::F00(opcode);
+                uint8_t yRegisterIndex = Opcode::F0(opcode);
+                return data.commonRegisters[xRegisterIndex] == data.commonRegisters[yRegisterIndex];
             }
             case SkipCondition::RegistersNotEqual: {
-                uint8_t regX = Opcode::F00(opcode_);
-                uint8_t regY = Opcode::F0(opcode_);
-                return data.common_registers[regX] != data.common_registers[regY];
+                uint8_t xRegisterIndex = Opcode::F00(opcode);
+                uint8_t yRegisterIndex = Opcode::F0(opcode);
+                return data.commonRegisters[xRegisterIndex] != data.commonRegisters[yRegisterIndex];
             }
             case SkipCondition::KeyPressed: {
-                uint8_t regX = Opcode::F00(opcode_);
-                uint8_t keyIndex = Opcode::F(data.common_registers[regX]);
+                uint8_t xRegisterIndex = Opcode::F00(opcode);
+                uint8_t keyIndex = Opcode::F(data.commonRegisters[xRegisterIndex]);
                 return static_cast<bool>(data.keyboard[keyIndex]);
             }
             case SkipCondition::KeyNotPressed: {
-                uint8_t regX = Opcode::F00(opcode_);
-                uint8_t keyIndex = Opcode::F(data.common_registers[regX]);
+                uint8_t xRegisterIndex = Opcode::F00(opcode);
+                uint8_t keyIndex = Opcode::F(data.commonRegisters[xRegisterIndex]);
                 return not static_cast<bool>(data.keyboard[keyIndex]);
             }
             default:
@@ -156,7 +156,7 @@ class SkipIf {
         }();
 
         if(conditionSatisfied)
-            data.program_counter += 2; // points to next command
+            data.programCounter += 2; // points to the next command
     }
 };
 
@@ -164,145 +164,145 @@ class ClearScreen {
   public:
     void execute(ChipData &data) {
         for(size_t i = 0; i < MonoScreen::WIDTH; i++) {
-            for(size_t j = 0; j < MonoScreen::HIGTH; j++) {
+            for(size_t j = 0; j < MonoScreen::HEIGHT; j++) {
                 data.screen.reset(i, j);
             }
         }
     }
 };
 
-class JumpToAdress {
+class JumpToAddress {
   private:
-    uint16_t adress_{};
+    uint16_t address{};
 
   public:
-    JumpToAdress(uint16_t command) : adress_(Opcode::FFF(command)) {}
-    void execute(ChipData &data) { data.program_counter = adress_; }
+    JumpToAddress(uint16_t command) : address(Opcode::FFF(command)) {}
+    void execute(ChipData &data) { data.programCounter = address; }
 };
 
 class SaveToRegister {
   private:
-    uint8_t register_{};
-    uint8_t value_{};
+    uint8_t registerIndex{};
+    uint8_t value{};
 
   public:
     SaveToRegister(uint16_t command)
-        : register_(Opcode::F00(command)), value_(Opcode::FF(command)) {}
+        : registerIndex(Opcode::F00(command)), value(Opcode::FF(command)) {}
 
     void execute(ChipData &data) {
-        data.common_registers[register_] = value_;
+        data.commonRegisters[registerIndex] = value;
     }
 };
 
 class SaveToIndexRegister {
   private:
-    uint16_t value_{};
+    uint16_t value{};
 
   public:
-    SaveToIndexRegister(uint16_t command) : value_(Opcode::FFF(command)) {}
+    SaveToIndexRegister(uint16_t command) : value(Opcode::FFF(command)) {}
 
-    void execute(ChipData &data) { data.index_register = value_; }
+    void execute(ChipData &data) { data.indexRegister = value; }
 };
 
 class AddToIndexRegister {
   private:
-    uint8_t register_{};
+    uint8_t registerIndex{};
 
   public:
-    AddToIndexRegister(uint16_t command) : register_(Opcode::F00(command)) {}
+    AddToIndexRegister(uint16_t command) : registerIndex(Opcode::F00(command)) {}
 
     void execute(ChipData &data) {
-        data.index_register += data.common_registers[register_];
+        data.indexRegister += data.commonRegisters[registerIndex];
     }
 };
 
 class StoreBinaryCodedDecimal {
   private:
-    uint8_t register_{};
+    uint8_t registerIndex{};
 
   public:
-    StoreBinaryCodedDecimal(uint16_t command) : register_(Opcode::F00(command)) {}
+    StoreBinaryCodedDecimal(uint16_t command) : registerIndex(Opcode::F00(command)) {}
 
     void execute(ChipData &data) {
-        const uint8_t value = data.common_registers[register_];
-        data.ram[data.index_register] = value / 100;
-        data.ram[data.index_register + 1] = (value / 10) % 10;
-        data.ram[data.index_register + 2] = value % 10;
+        const uint8_t value = data.commonRegisters[registerIndex];
+        data.ram[data.indexRegister] = value / 100;
+        data.ram[data.indexRegister + 1] = (value / 10) % 10;
+        data.ram[data.indexRegister + 2] = value % 10;
     }
 };
 
 class AddToRegister {
   private:
-    uint8_t register_{};
-    uint8_t value_{};
+    uint8_t registerIndex{};
+    uint8_t value{};
 
   public:
     AddToRegister(uint16_t command)
-        : register_(Opcode::F00(command)), value_(Opcode::FF(command)) {}
+        : registerIndex(Opcode::F00(command)), value(Opcode::FF(command)) {}
 
     void execute(ChipData &data) {
-        data.common_registers[register_] += value_;
+        data.commonRegisters[registerIndex] += value;
     }
 };
 
 class DrawSprite {
   private:
-    uint8_t xReg_{};
-    uint8_t yReg_{};
-    uint8_t rows_{};
+    uint8_t xRegisterIndex{};
+    uint8_t yRegisterIndex{};
+    uint8_t rowCount{};
 
     template <uint8_t size>
-    std::optional<uint8_t> newPos(uint8_t pos, uint8_t offset) {
+    std::optional<uint8_t> offsetPosition(uint8_t position, uint8_t offset) {
 
-        uint8_t next = pos + offset;
-        switch(ConfigStorage::getConfig().colisionType) {
-        case SpriteColisionType::Wrapping:
-            return next % size;
-        case SpriteColisionType::Clipping:
-            if(next >= size)
+        uint8_t nextPosition = position + offset;
+        switch(ConfigStorage::getConfig().collisionType) {
+        case SpriteCollisionType::Wrapping:
+            return nextPosition % size;
+        case SpriteCollisionType::Clipping:
+            if(nextPosition >= size)
                 return std::nullopt;
-            return next;
+            return nextPosition;
         }
-        throw std::logic_error("Unknown SpriteColisionType");
+        throw std::logic_error("Unknown SpriteCollisionType");
     }
 
   public:
     DrawSprite(uint16_t command)
-        : xReg_(Opcode::F00(command)), yReg_(Opcode::F0(command)),
-          rows_(Opcode::F(command)) {}
+        : xRegisterIndex(Opcode::F00(command)), yRegisterIndex(Opcode::F0(command)),
+          rowCount(Opcode::F(command)) {}
 
     void execute(ChipData &data) {
 
-        uint8_t xPos = data.common_registers[xReg_] % MonoScreen::WIDTH;
-        uint8_t yPos = data.common_registers[yReg_] % MonoScreen::HIGTH;
+        uint8_t xPosition = data.commonRegisters[xRegisterIndex] % MonoScreen::WIDTH;
+        uint8_t yPosition = data.commonRegisters[yRegisterIndex] % MonoScreen::HEIGHT;
 
-        uint8_t colisionRegister = 0xF;
+        uint8_t collisionRegisterIndex = 0xF;
 
-        data.common_registers[colisionRegister] = 0;
+        data.commonRegisters[collisionRegisterIndex] = 0;
 
-        for(uint8_t i = 0; i < rows_; i++) {
+        for(uint8_t i = 0; i < rowCount; i++) {
 
-            uint8_t spriteByte = data.ram.at(data.index_register + i);
-            auto currentYpos = newPos<MonoScreen::HIGTH>(yPos, i);
+            uint8_t spriteByte = data.ram.at(data.indexRegister + i);
+            auto currentYPosition = offsetPosition<MonoScreen::HEIGHT>(yPosition, i);
 
-            if(not currentYpos)
+            if(not currentYPosition)
                 continue;
 
             for(uint8_t j = 0; j < 8; j++) {
 
-                auto currentXpos = newPos<MonoScreen::WIDTH>(xPos, j);
+                auto currentXPosition = offsetPosition<MonoScreen::WIDTH>(xPosition, j);
 
-                if(not currentXpos)
+                if(not currentXPosition)
                     continue;
 
                 uint8_t color = spriteByte & (0x1 << (7 - j));
 
                 if(color > 0) {
-                    if(data.screen.get(*currentXpos, *currentYpos) == 1) {
-                        data.common_registers[colisionRegister] = 1;
-                        data.screen.reset(*currentXpos, *currentYpos);
+                    if(data.screen.get(*currentXPosition, *currentYPosition) == 1) {
+                        data.commonRegisters[collisionRegisterIndex] = 1;
+                        data.screen.reset(*currentXPosition, *currentYPosition);
                     } else {
-                        data.screen.set(*currentXpos, *currentYpos);
+                        data.screen.set(*currentXPosition, *currentYPosition);
                     }
                 }
             }
@@ -310,74 +310,74 @@ class DrawSprite {
     }
 };
 
-class TwoAdressInstruction {
+class TwoAddressInstruction {
   private:
-    uint8_t xReg_{};
-    uint8_t yReg_{};
-    uint8_t operationType_{};
+    uint8_t xRegisterIndex{};
+    uint8_t yRegisterIndex{};
+    uint8_t operationType{};
 
   public:
-    TwoAdressInstruction(uint16_t command)
-        : xReg_(Opcode::F00(command)), yReg_(Opcode::F0(command)),
-          operationType_(Opcode::F(command)) {}
+    TwoAddressInstruction(uint16_t command)
+        : xRegisterIndex(Opcode::F00(command)), yRegisterIndex(Opcode::F0(command)),
+          operationType(Opcode::F(command)) {}
     void execute(ChipData &data) {
-        auto &xVal = data.common_registers[xReg_];
-        auto &yVal = data.common_registers[yReg_];
-        auto &fV = data.common_registers[0xF];
+        auto &xValue = data.commonRegisters[xRegisterIndex];
+        auto &yValue = data.commonRegisters[yRegisterIndex];
+        auto &flagRegister = data.commonRegisters[0xF];
 
-        switch(operationType_) {
+        switch(operationType) {
         case 0:
-            xVal = yVal;
+            xValue = yValue;
             break;
 
         case 1:
-            xVal |= yVal;
-            fV = 0; // COSMAC based variants resets fv
+            xValue |= yValue;
+            flagRegister = 0; // COSMAC-based variants reset VF
             break;
 
         case 2:
-            xVal &= yVal;
-            fV = 0;
+            xValue &= yValue;
+            flagRegister = 0;
             break;
 
         case 3:
-            xVal ^= yVal;
-            fV = 0;
+            xValue ^= yValue;
+            flagRegister = 0;
             break;
 
         case 4: {
-            const uint16_t sum = xVal + yVal;
-            xVal = static_cast<uint8_t>(sum);
-            fV = sum > 0xFF;
+            const uint16_t sum = xValue + yValue;
+            xValue = static_cast<uint8_t>(sum);
+            flagRegister = sum > 0xFF;
             break;
         }
 
         case 5: {
-            const uint8_t flag = xVal >= yVal;
-            xVal -= yVal;
-            fV = flag;
+            const uint8_t flag = xValue >= yValue;
+            xValue -= yValue;
+            flagRegister = flag;
             break;
         }
 
         case 6: {
-            const uint8_t value = yVal;
+            const uint8_t value = yValue;
             const uint8_t flag = value & 0x1;
-            xVal = (value >> 1);
-            fV = flag;
+            xValue = (value >> 1);
+            flagRegister = flag;
             break;
         }
         case 7: {
-            const uint8_t flag = yVal >= xVal;
-            xVal = yVal - xVal;
-            fV = flag;
+            const uint8_t flag = yValue >= xValue;
+            xValue = yValue - xValue;
+            flagRegister = flag;
             break;
         }
 
         case 0xE: {
-            const uint8_t value = yVal;
+            const uint8_t value = yValue;
             const uint8_t flag = (value >> 7) & 0x1;
-            xVal = static_cast<uint8_t>((value << 1));
-            fV = flag;
+            xValue = static_cast<uint8_t>((value << 1));
+            flagRegister = flag;
             break;
         }
         default: {
@@ -389,25 +389,25 @@ class TwoAdressInstruction {
 
 class AssemblyCommand {
   private:
-    using Storage = std::variant<ClearScreen, JumpToAdress, SaveToRegister,
+    using Storage = std::variant<ClearScreen, JumpToAddress, SaveToRegister,
                                  AddToRegister, SaveToIndexRegister, DrawSprite,
-                                 TwoAdressInstruction, SkipIf, AddToIndexRegister,
+                                 TwoAddressInstruction, SkipIf, AddToIndexRegister,
                                  StoreBinaryCodedDecimal>;
-    Storage instruction_;
+    Storage instruction;
 
   public:
     template <class T>
-    explicit AssemblyCommand(T instruction) // nie trzeba dac jakiegos &&T ?
-        : instruction_(std::move(instruction)) {}
+    explicit AssemblyCommand(T decodedInstruction) // Czy nie trzeba dać tutaj T&&?
+        : instruction(std::move(decodedInstruction)) {}
 
     template <class T>
     bool is() const {
-        return std::holds_alternative<T>(instruction_);
+        return std::holds_alternative<T>(instruction);
     }
 
     void execute(ChipData &data) {
-        std::visit([&data](auto &instruction) { instruction.execute(data); },
-                   instruction_);
+        std::visit([&data](auto &decodedInstruction) { decodedInstruction.execute(data); },
+                   instruction);
     }
 };
 
@@ -420,7 +420,7 @@ class Decoder {
                 return AssemblyCommand{ClearScreen{}};
             break;
         case 0x1000:
-            return AssemblyCommand{JumpToAdress{command}};
+            return AssemblyCommand{JumpToAddress{command}};
         case 0x3000:
             return AssemblyCommand{SkipIf{command, SkipCondition::EqualToValue}};
         case 0x4000:
@@ -440,7 +440,7 @@ class Decoder {
         case 0x7000:
             return AssemblyCommand{AddToRegister{command}};
         case 0x8000:
-            return AssemblyCommand{TwoAdressInstruction{command}};
+            return AssemblyCommand{TwoAddressInstruction{command}};
         case 0xA000:
             return AssemblyCommand{SaveToIndexRegister{command}};
         case 0xD000:
@@ -487,7 +487,7 @@ bool matchesCommand(const AssemblyCommand &command) {
 
 const auto decodingCases = std::to_array<DecodingTestCase>({
     {0x00E0, matchesCommand<ClearScreen>},
-    {0x1111, matchesCommand<JumpToAdress>},
+    {0x1111, matchesCommand<JumpToAddress>},
     {0x3123, matchesCommand<SkipIf>},
     {0x4123, matchesCommand<SkipIf>},
     {0x5120, matchesCommand<SkipIf>},
@@ -496,15 +496,15 @@ const auto decodingCases = std::to_array<DecodingTestCase>({
     {0xE1A1, matchesCommand<SkipIf>},
     {0x6111, matchesCommand<SaveToRegister>},
     {0x7111, matchesCommand<AddToRegister>},
-    {0x8120, matchesCommand<TwoAdressInstruction>},
-    {0x8121, matchesCommand<TwoAdressInstruction>},
-    {0x8122, matchesCommand<TwoAdressInstruction>},
-    {0x8123, matchesCommand<TwoAdressInstruction>},
-    {0x8124, matchesCommand<TwoAdressInstruction>},
-    {0x8125, matchesCommand<TwoAdressInstruction>},
-    {0x8126, matchesCommand<TwoAdressInstruction>},
-    {0x8127, matchesCommand<TwoAdressInstruction>},
-    {0x812E, matchesCommand<TwoAdressInstruction>},
+    {0x8120, matchesCommand<TwoAddressInstruction>},
+    {0x8121, matchesCommand<TwoAddressInstruction>},
+    {0x8122, matchesCommand<TwoAddressInstruction>},
+    {0x8123, matchesCommand<TwoAddressInstruction>},
+    {0x8124, matchesCommand<TwoAddressInstruction>},
+    {0x8125, matchesCommand<TwoAddressInstruction>},
+    {0x8126, matchesCommand<TwoAddressInstruction>},
+    {0x8127, matchesCommand<TwoAddressInstruction>},
+    {0x812E, matchesCommand<TwoAddressInstruction>},
     {0xA111, matchesCommand<SaveToIndexRegister>},
     {0xD123, matchesCommand<DrawSprite>},
     {0xF31E, matchesCommand<AddToIndexRegister>},
@@ -528,26 +528,26 @@ TEST(MachineCode, ExecuteCommand) {
     clearScreen.execute(data);
     ASSERT_EQ(data.screen.get(0, 0), 0);
 
-    auto jumpToAdress = decoder.decode(0x1111);
-    jumpToAdress.execute(data);
-    ASSERT_EQ(data.program_counter, 0x0111);
+    auto jumpToAddress = decoder.decode(0x1111);
+    jumpToAddress.execute(data);
+    ASSERT_EQ(data.programCounter, 0x0111);
 
     auto saveToRegister = decoder.decode(0x6111);
     saveToRegister.execute(data);
-    ASSERT_EQ(data.common_registers[0x01], 0x0011);
+    ASSERT_EQ(data.commonRegisters[0x01], 0x0011);
 
     auto addToRegister = decoder.decode(0x7111);
     addToRegister.execute(data);
-    ASSERT_EQ(data.common_registers[0x01], 0x0022);
+    ASSERT_EQ(data.commonRegisters[0x01], 0x0022);
 
     auto saveToIndexRegister = decoder.decode(0xA111);
     saveToIndexRegister.execute(data);
-    ASSERT_EQ(data.index_register, 0x0111);
+    ASSERT_EQ(data.indexRegister, 0x0111);
 
     auto addToIndexRegister = decoder.decode(0xF11E);
     addToIndexRegister.execute(data);
-    ASSERT_EQ(data.index_register, 0x0133);
-    ASSERT_EQ(data.common_registers[0x01], 0x0022);
+    ASSERT_EQ(data.indexRegister, 0x0133);
+    ASSERT_EQ(data.commonRegisters[0x01], 0x0022);
 }
 
 struct BinaryCodedDecimalTestCase {
@@ -562,8 +562,8 @@ TEST_P(StoreBinaryCodedDecimalTest, ExecuteCommand) {
     const auto &testCase = GetParam();
     ChipData data{};
     Decoder decoder;
-    data.index_register = 0x300;
-    data.common_registers[5] = testCase.value;
+    data.indexRegister = 0x300;
+    data.commonRegisters[5] = testCase.value;
     data.ram.fill(0xAA);
 
     auto command = decoder.decode(0xF533);
@@ -573,8 +573,8 @@ TEST_P(StoreBinaryCodedDecimalTest, ExecuteCommand) {
         EXPECT_EQ(data.ram[0x300 + i], testCase.digits[i]);
     EXPECT_EQ(data.ram[0x2FF], 0xAA);
     EXPECT_EQ(data.ram[0x303], 0xAA);
-    EXPECT_EQ(data.index_register, 0x300);
-    EXPECT_EQ(data.common_registers[5], testCase.value);
+    EXPECT_EQ(data.indexRegister, 0x300);
+    EXPECT_EQ(data.commonRegisters[5], testCase.value);
 }
 
 constexpr auto binaryCodedDecimalCases =
@@ -628,39 +628,39 @@ TEST_P(SkipIfTest, ExecuteCommand) {
     const auto &testCase = GetParam();
     ChipData data{};
     Decoder decoder;
-    data.program_counter = 0x200;
+    data.programCounter = 0x200;
 
     if(const auto *registersData = std::get_if<RegistersData>(&testCase.data)) {
-        data.common_registers[1] = registersData->x;
-        data.common_registers[2] = registersData->y;
+        data.commonRegisters[1] = registersData->x;
+        data.commonRegisters[2] = registersData->y;
     }
     if(const auto *keyData = std::get_if<KeyData>(&testCase.data)) {
-        data.common_registers[1] = keyData->keyIndex;
+        data.commonRegisters[1] = keyData->keyIndex;
         data.keyboard[keyData->keyIndex] = keyData->pressed;
     }
 
     auto command = decoder.decode(testCase.opcode);
     command.execute(data);
 
-    ASSERT_EQ(data.program_counter, testCase.expectedProgramCounter);
+    ASSERT_EQ(data.programCounter, testCase.expectedProgramCounter);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     MachineCode, SkipIfTest, testing::ValuesIn(skipIfCases),
     [](const auto &info) { return std::string(info.param.name); });
 
-std::string readSprite(uint8_t xPos, uint8_t yPos, uint8_t rows,
+std::string readSprite(uint8_t xPosition, uint8_t yPosition, uint8_t rows,
                        const MonoScreen &screen) {
 
     std::string line{};
     std::string sprite{};
-    std::stringstream ss{};
-    ss << screen;
+    std::stringstream screenStream{};
+    screenStream << screen;
     size_t index{0};
-    while(std::getline(ss, line) and
+    while(std::getline(screenStream, line) and
           (std::count(sprite.begin(), sprite.end(), '\n') < rows)) {
-        if(index >= yPos) {
-            sprite.append(line.substr(xPos, 8));
+        if(index >= yPosition) {
+            sprite.append(line.substr(xPosition, 8));
             sprite.push_back('\n');
         }
         index++;
@@ -673,38 +673,38 @@ TEST(MachineCode, DrawSprite) {
     ChipData data;
 
     // loading sprite to ram
-    data.index_register = 0;
+    data.indexRegister = 0;
     data.ram[0] = 0x66;
     data.ram[1] = 0x7E;
     data.ram[2] = 0xC3;
     data.ram[3] = 0x99;
 
     // setup X and Y
-    uint8_t xPos = 1;
-    uint8_t yPos = 1;
-    data.common_registers[2] = xPos;
-    data.common_registers[3] = yPos;
+    uint8_t xPosition = 1;
+    uint8_t yPosition = 1;
+    data.commonRegisters[2] = xPosition;
+    data.commonRegisters[3] = yPosition;
 
-    auto drawScreen = decoder.decode(0xD234);
-    drawScreen.execute(data);
+    auto drawSprite = decoder.decode(0xD234);
+    drawSprite.execute(data);
 
     auto expectedSprite = "O##OO##O\nO######O\n##OOOO##\n#OO##OO#\n";
-    auto fetchedSprite = readSprite(xPos, yPos, 4, data.screen);
+    auto fetchedSprite = readSprite(xPosition, yPosition, 4, data.screen);
 
     ASSERT_EQ(expectedSprite, fetchedSprite);
-    ASSERT_EQ(data.common_registers[0xF], 0);
+    ASSERT_EQ(data.commonRegisters[0xF], 0);
 
     // clear screen with the same sprite
-    drawScreen.execute(data);
+    drawSprite.execute(data);
 
     expectedSprite = "OOOOOOOO\nOOOOOOOO\nOOOOOOOO\nOOOOOOOO\n";
-    fetchedSprite = readSprite(xPos, yPos, 4, data.screen);
+    fetchedSprite = readSprite(xPosition, yPosition, 4, data.screen);
 
     ASSERT_EQ(expectedSprite, fetchedSprite);
-    ASSERT_EQ(data.common_registers[0xF], 1);
+    ASSERT_EQ(data.commonRegisters[0xF], 1);
 }
 
-struct TwoAdressTestCase {
+struct TwoAddressTestCase {
     std::string_view name;
     uint16_t opcode;
     uint8_t x;
@@ -714,26 +714,26 @@ struct TwoAdressTestCase {
     uint8_t expectedFlag;
 };
 
-class TwoAdressInstructionTest
-    : public testing::TestWithParam<TwoAdressTestCase> {};
+class TwoAddressInstructionTest
+    : public testing::TestWithParam<TwoAddressTestCase> {};
 
-TEST_P(TwoAdressInstructionTest, ExecuteCommand) {
+TEST_P(TwoAddressInstructionTest, ExecuteCommand) {
     const auto &testCase = GetParam();
     ChipData data{};
     Decoder decoder;
-    data.common_registers[1] = testCase.x;
-    data.common_registers[2] = testCase.y;
-    data.common_registers[0xF] = testCase.initialFlag;
+    data.commonRegisters[1] = testCase.x;
+    data.commonRegisters[2] = testCase.y;
+    data.commonRegisters[0xF] = testCase.initialFlag;
 
     auto command = decoder.decode(testCase.opcode);
     command.execute(data);
 
-    ASSERT_EQ(data.common_registers[1], testCase.expectedX);
-    ASSERT_EQ(data.common_registers[2], testCase.y);
-    ASSERT_EQ(data.common_registers[0xF], testCase.expectedFlag);
+    ASSERT_EQ(data.commonRegisters[1], testCase.expectedX);
+    ASSERT_EQ(data.commonRegisters[2], testCase.y);
+    ASSERT_EQ(data.commonRegisters[0xF], testCase.expectedFlag);
 }
 
-constexpr auto twoAdressCases = std::to_array<TwoAdressTestCase>({
+constexpr auto twoAddressCases = std::to_array<TwoAddressTestCase>({
     {"Copy", 0x8120, 0xAA, 0x55, 1, 0x55, 1},
     {"Or", 0x8121, 0xA5, 0x3C, 1, 0xBD, 0},
     {"And", 0x8122, 0xA5, 0x3C, 1, 0x24, 0},
@@ -754,7 +754,7 @@ constexpr auto twoAdressCases = std::to_array<TwoAdressTestCase>({
 });
 
 INSTANTIATE_TEST_SUITE_P(
-    MachineCode, TwoAdressInstructionTest, testing::ValuesIn(twoAdressCases),
+    MachineCode, TwoAddressInstructionTest, testing::ValuesIn(twoAddressCases),
     [](const auto &info) {
         return std::string(info.param.name);
     });

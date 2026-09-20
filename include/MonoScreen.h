@@ -8,10 +8,10 @@
 class MonoScreen {
 public:
   static const std::uint8_t WIDTH = 64;
-  static const std::uint8_t HIGTH = 32;
+  static const std::uint8_t HEIGHT = 32;
 
 private:
-  std::array<std::uint8_t, WIDTH * HIGTH> screen;
+  std::array<std::uint8_t, WIDTH * HEIGHT> screen;
 
 public:
   MonoScreen() {
@@ -20,35 +20,35 @@ public:
     }
   }
 
-  void set(std::size_t i, std::size_t j) {
-    if (i >= WIDTH or j >= HIGTH) {
-      throw std::out_of_range("screen coordinates out of bands");
+  void set(std::size_t x, std::size_t y) {
+    if (x >= WIDTH or y >= HEIGHT) {
+      throw std::out_of_range("screen coordinates out of bounds");
     }
-    screen[i + j * WIDTH] = 1;
+    screen[x + y * WIDTH] = 1;
   }
 
-  void reset(std::size_t i, std::size_t j) {
-    if (i >= WIDTH or j >= HIGTH) {
-      throw std::out_of_range("screen coordinates out of bands");
+  void reset(std::size_t x, std::size_t y) {
+    if (x >= WIDTH or y >= HEIGHT) {
+      throw std::out_of_range("screen coordinates out of bounds");
     }
-    screen[i + j * WIDTH] = 0;
+    screen[x + y * WIDTH] = 0;
   }
 
-  std::uint8_t get(std::size_t i, std::size_t j) const {
-    if (i >= WIDTH or j >= HIGTH) {
-      throw std::out_of_range("screen coordinates out of bands");
+  std::uint8_t get(std::size_t x, std::size_t y) const {
+    if (x >= WIDTH or y >= HEIGHT) {
+      throw std::out_of_range("screen coordinates out of bounds");
     }
-    return screen[i + j * WIDTH];
+    return screen[x + y * WIDTH];
   }
 };
 
-std::ostream &operator<<(std::ostream &os, const MonoScreen &obj) {
-  // write obj to stream
-  for (std::size_t i = 0; i < MonoScreen::HIGTH; i++) {
-    for (std::size_t j = 0; j < MonoScreen::WIDTH; j++) {
-      os << ((obj.get(j, i) == 0) ? "O" : "#");
+std::ostream &operator<<(std::ostream &output, const MonoScreen &screen) {
+  // Write the screen to the stream.
+  for (std::size_t y = 0; y < MonoScreen::HEIGHT; y++) {
+    for (std::size_t x = 0; x < MonoScreen::WIDTH; x++) {
+      output << ((screen.get(x, y) == 0) ? "O" : "#");
     }
-    os << '\n';
+    output << '\n';
   }
-  return os;
+  return output;
 }
