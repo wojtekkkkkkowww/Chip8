@@ -13,6 +13,7 @@
 struct ChipData {
     std::array<uint8_t, 4096> ram{};
     std::array<uint8_t, 16> common_registers{};
+    std::array<uint8_t, 16> keyboard{};
     uint16_t index_register{};
     uint16_t program_counter{};
     MonoScreen screen;
@@ -49,20 +50,20 @@ TEST(ScreenTest, ScreenInit) {
 
 /*
 enum class CommandName {
-    ClearScreen,
-    JumpToAdress,
-    SaveToRegister,
-    AddToRegister,
-    SaveToIndexRegister,
-    DrawSprite,
-    TwoAdressInstruction,
+    ClearScreen, // +
+    JumpToAdress, // +
+    SaveToRegister, // +
+    AddToRegister, // +
+    SaveToIndexRegister, // +
+    DrawSprite, // +
+    TwoAdressInstruction, // +
     CallNativeRoutine,
     ReturnFromSubroutine,
     CallSubroutine,
-    SkipIfEqualToValue,
-    SkipIfNotEqualToValue,
-    SkipIfRegistersEqual,
-    SkipIfRegistersNotEqual,
+    SkipIfEqualToValue, // +
+    SkipIfNotEqualToValue, // +
+    SkipIfRegistersEqual, // +
+    SkipIfRegistersNotEqual, //+
     JumpWithOffset,
     RandomWithMask,
     SkipIfKeyPressed,
@@ -88,9 +89,9 @@ static constexpr uint8_t F(uint16_t opcode) {
     return static_cast<uint8_t>(opcode & 0x000F);
 }
 // >> has biger prio than &
-static constexpr uint8_t F000(uint16_t opcode) {
-    return static_cast<uint8_t>((opcode & 0xF000) >> 12);
-}
+// static constexpr uint8_t F000(uint16_t opcode) {
+//    return static_cast<uint8_t>((opcode & 0xF000) >> 12);
+//}
 static constexpr uint8_t F00(uint16_t opcode) {
     return static_cast<uint8_t>((opcode & 0x0F00) >> 8);
 }
@@ -98,6 +99,66 @@ static constexpr uint8_t F0(uint16_t opcode) {
     return static_cast<uint8_t>((opcode & 0x00F0) >> 4);
 }
 } // namespace Opcode
+
+enum class SkipCondition {
+    EqualToValue,
+    NotEqualToValue,
+    RegistersEqual,
+    RegistersNotEqual,
+    KeyPressed,
+    KeyNotPressed
+};
+
+class SkipIf {
+  private:
+    SkipCondition condition_{};
+    uint16_t opcode_;
+
+  public:
+    SkipIf(uint16_t opcode, SkipCondition condition)
+        : condition_(condition), opcode_(opcode) {}
+    void execute(ChipData &data) {
+        bool conditionSatisfied = [this, &data]() {
+            switch(condition_) {
+            case SkipCondition::EqualToValue: {
+                uint8_t regX = Opcode::F00(opcode_);
+                uint8_t number = Opcode::FF(opcode_);
+                return data.common_registers[regX] == number;
+            }
+            case SkipCondition::NotEqualToValue: {
+                uint8_t regX = Opcode::F00(opcode_);
+                uint8_t number = Opcode::FF(opcode_);
+                return data.common_registers[regX] != number;
+            }
+            case SkipCondition::RegistersEqual: {
+                uint8_t regX = Opcode::F00(opcode_);
+                uint8_t regY = Opcode::F0(opcode_);
+                return data.common_registers[regX] == data.common_registers[regY];
+            }
+            case SkipCondition::RegistersNotEqual: {
+                uint8_t regX = Opcode::F00(opcode_);
+                uint8_t regY = Opcode::F0(opcode_);
+                return data.common_registers[regX] != data.common_registers[regY];
+            }
+            case SkipCondition::KeyPressed: {
+                uint8_t regX = Opcode::F00(opcode_);
+                uint8_t keyIndex = Opcode::F(data.common_registers[regX]);
+                return static_cast<bool>(data.keyboard[keyIndex]);
+            }
+            case SkipCondition::KeyNotPressed: {
+                uint8_t regX = Opcode::F00(opcode_);
+                uint8_t keyIndex = Opcode::F(data.common_registers[regX]);
+                return not static_cast<bool>(data.keyboard[keyIndex]);
+            }
+            default:
+                return false;
+            }
+        }();
+
+        if(conditionSatisfied)
+            data.program_counter += 2; // points to next command
+    }
+};
 
 class ClearScreen {
   public:
@@ -303,12 +364,12 @@ class AssemblyCommand {
   private:
     using Storage = std::variant<ClearScreen, JumpToAdress, SaveToRegister,
                                  AddToRegister, SaveToIndexRegister, DrawSprite,
-                                 TwoAdressInstruction>;
+                                 TwoAdressInstruction, SkipIf>;
     Storage instruction_;
 
   public:
     template <class T>
-    explicit AssemblyCommand(T instruction)
+    explicit AssemblyCommand(T instruction) // nie trzeba dac jakiegos &&T ?
         : instruction_(std::move(instruction)) {}
 
     template <class T>
@@ -332,6 +393,20 @@ class Decoder {
             break;
         case 0x1000:
             return AssemblyCommand{JumpToAdress{command}};
+        case 0x3000:
+            return AssemblyCommand{SkipIf{command, SkipCondition::EqualToValue}};
+        case 0x4000:
+            return AssemblyCommand{SkipIf{command, SkipCondition::NotEqualToValue}};
+        case 0x5000:
+            if(Opcode::F(command) == 0)
+                return AssemblyCommand{
+                    SkipIf{command, SkipCondition::RegistersEqual}};
+            break;
+        case 0x9000:
+            if(Opcode::F(command) == 0)
+                return AssemblyCommand{
+                    SkipIf{command, SkipCondition::RegistersNotEqual}};
+            break;
         case 0x6000:
             return AssemblyCommand{SaveToRegister{command}};
         case 0x7000:
@@ -342,6 +417,14 @@ class Decoder {
             return AssemblyCommand{SaveToIndexRegister{command}};
         case 0xD000:
             return AssemblyCommand{DrawSprite{command}};
+        case 0xE000:
+            if(Opcode::FF(command) == 0x9E)
+                return AssemblyCommand{
+                    SkipIf{command, SkipCondition::KeyPressed}};
+            if(Opcode::FF(command) == 0xA1)
+                return AssemblyCommand{
+                    SkipIf{command, SkipCondition::KeyNotPressed}};
+            break;
         }
 
         throw std::runtime_error("Unknown Chip-8 opcode");
@@ -371,6 +454,12 @@ bool matchesCommand(const AssemblyCommand &command) {
 const auto decodingCases = std::to_array<DecodingTestCase>({
     {0x00E0, matchesCommand<ClearScreen>},
     {0x1111, matchesCommand<JumpToAdress>},
+    {0x3123, matchesCommand<SkipIf>},
+    {0x4123, matchesCommand<SkipIf>},
+    {0x5120, matchesCommand<SkipIf>},
+    {0x9120, matchesCommand<SkipIf>},
+    {0xE19E, matchesCommand<SkipIf>},
+    {0xE1A1, matchesCommand<SkipIf>},
     {0x6111, matchesCommand<SaveToRegister>},
     {0x7111, matchesCommand<AddToRegister>},
     {0x8120, matchesCommand<TwoAdressInstruction>},
@@ -419,6 +508,65 @@ TEST(MachineCode, ExecuteCommand) {
     saveToIndexRegister.execute(data);
     ASSERT_EQ(data.index_register, 0x0111);
 }
+
+struct RegistersData {
+    uint8_t x;
+    uint8_t y;
+};
+struct KeyData {
+    uint8_t keyIndex;
+    bool pressed;
+};
+
+struct SkipIfTestCase {
+    std::string_view name;
+    uint16_t opcode;
+    uint16_t expectedProgramCounter;
+    std::variant<RegistersData, KeyData> data;
+};
+
+class SkipIfTest
+    : public testing::TestWithParam<SkipIfTestCase> {};
+
+constexpr auto skipIfCases = std::to_array<SkipIfTestCase>({
+    {"EqualValueTrue", 0x3123, 0x202, RegistersData{0x23, 0}},
+    {"EqualValueFalse", 0x3123, 0x200, RegistersData{0x24, 0}},
+    {"NotEqualValueTrue", 0x4123, 0x202, RegistersData{0x24, 0}},
+    {"NotEqualValueFalse", 0x4123, 0x200, RegistersData{0x23, 0}},
+    {"EqualRegistersTrue", 0x5120, 0x202, RegistersData{7, 7}},
+    {"EqualRegistersFalse", 0x5120, 0x200, RegistersData{7, 8}},
+    {"NotEqualRegistersTrue", 0x9120, 0x202, RegistersData{7, 8}},
+    {"NotEqualRegistersFalse", 0x9120, 0x200, RegistersData{7, 7}},
+    {"KeyPressedTrue", 0xE19E, 0x202, KeyData{0xA, true}},
+    {"KeyPressedFalse", 0xE19E, 0x200, KeyData{0xA, false}},
+    {"KeyNotPressedTrue", 0xE1A1, 0x202, KeyData{0xA, false}},
+    {"KeyNotPressedFalse", 0xE1A1, 0x200, KeyData{0xA, true}},
+});
+
+TEST_P(SkipIfTest, ExecuteCommand) {
+    const auto &testCase = GetParam();
+    ChipData data{};
+    Decoder decoder;
+    data.program_counter = 0x200;
+
+    if(const auto *registersData = std::get_if<RegistersData>(&testCase.data)) {
+        data.common_registers[1] = registersData->x;
+        data.common_registers[2] = registersData->y;
+    }
+    if(const auto *keyData = std::get_if<KeyData>(&testCase.data)) {
+        data.common_registers[1] = keyData->keyIndex;
+        data.keyboard[keyData->keyIndex] = keyData->pressed;
+    }
+
+    auto command = decoder.decode(testCase.opcode);
+    command.execute(data);
+
+    ASSERT_EQ(data.program_counter, testCase.expectedProgramCounter);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MachineCode, SkipIfTest, testing::ValuesIn(skipIfCases),
+    [](const auto &info) { return std::string(info.param.name); });
 
 std::string readSprite(uint8_t xPos, uint8_t yPos, uint8_t rows,
                        const MonoScreen &screen) {
