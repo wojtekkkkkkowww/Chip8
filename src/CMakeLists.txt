@@ -1,21 +1,16 @@
-add_library(Chip8 INTERFACE)
-target_include_directories(Chip8 INTERFACE
+add_library(Chip8 STATIC
+    MonoScreen.cc
+    Instructions.cc
+    DrawSprite.cc
+    AssemblyCommand.cc
+    Decoder.cc
+)
+target_include_directories(Chip8 PUBLIC
     ${PROJECT_SOURCE_DIR}/include
 )
-target_compile_options(Chip8 INTERFACE
-    ${PROJECT_FLAGS}
-)
+target_compile_features(Chip8 PUBLIC cxx_std_20)
+target_compile_options(Chip8 PRIVATE ${PROJECT_FLAGS})
 
-add_executable(runChip8
-   emulator.cc
-)
-
-target_sources(runChip8
-  PRIVATE
-    emulator.cc
-)
-
-target_link_libraries(runChip8 
-    PRIVATE
-        Chip8
-)
+add_executable(runChip8 emulator.cc)
+target_compile_options(runChip8 PRIVATE ${PROJECT_FLAGS})
+target_link_libraries(runChip8 PRIVATE Chip8)

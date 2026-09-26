@@ -10,8 +10,6 @@ set(PROJECT_FLAGS
     -Werror
 )
 
-add_compile_options(-std=c++20)
-
 project(Chip8)
 
 ## Adding the GoogleTest library to the project
@@ -25,6 +23,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(googletest)
 
+enable_testing()
 add_subdirectory(src)
 add_subdirectory(tests)
-enable_testing()
