@@ -229,6 +229,28 @@ class AddToIndexRegister {
     }
 };
 
+enum class RegisterTransferDirection { Store,
+                                       Load };
+
+class TransferRegisters {
+  private:
+    uint8_t registerIndex{};
+    RegisterTransferDirection direction;
+
+  public:
+    TransferRegisters(uint16_t command, RegisterTransferDirection transferDirection)
+        : registerIndex(Opcode::F00(command)), direction(transferDirection) {}
+
+    void execute(ChipData &data) {
+        for(size_t i = 0; i <= registerIndex; ++i) {
+            if(direction == RegisterTransferDirection::Store)
+                data.ram.at(data.indexRegister + i) = data.commonRegisters[i];
+            else
+                data.commonRegisters[i] = data.ram.at(data.indexRegister + i);
+        }
+    }
+};
+
 class StoreBinaryCodedDecimal {
   private:
     uint8_t registerIndex{};
@@ -405,7 +427,8 @@ class AssemblyCommand {
     using Storage = std::variant<ClearScreen, JumpToAddress, SaveToRegister,
                                  AddToRegister, SaveToIndexRegister, DrawSprite,
                                  TwoAddressInstruction, SkipIf, AddToIndexRegister,
-                                 StoreBinaryCodedDecimal, JumpWithOffset>;
+                                 StoreBinaryCodedDecimal, JumpWithOffset,
+                                 TransferRegisters>;
     Storage instruction;
 
   public:
@@ -473,6 +496,12 @@ class Decoder {
                 return AssemblyCommand{AddToIndexRegister{command}};
             if(Opcode::FF(command) == 0x33)
                 return AssemblyCommand{StoreBinaryCodedDecimal{command}};
+            if(Opcode::FF(command) == 0x55)
+                return AssemblyCommand{
+                    TransferRegisters{command, RegisterTransferDirection::Store}};
+            if(Opcode::FF(command) == 0x65)
+                return AssemblyCommand{
+                    TransferRegisters{command, RegisterTransferDirection::Load}};
             break;
         }
 
@@ -525,6 +554,8 @@ const auto decodingCases = std::to_array<DecodingTestCase>({
     {0xD123, matchesCommand<DrawSprite>},
     {0xF31E, matchesCommand<AddToIndexRegister>},
     {0xF533, matchesCommand<StoreBinaryCodedDecimal>},
+    {0xF355, matchesCommand<TransferRegisters>},
+    {0xF365, matchesCommand<TransferRegisters>},
 });
 
 INSTANTIATE_TEST_SUITE_P(
@@ -571,6 +602,66 @@ TEST(MachineCode, ExecuteCommand) {
     ASSERT_EQ(data.indexRegister, 0x0133);
     ASSERT_EQ(data.commonRegisters[0x01], 0x0022);
 }
+
+struct TransferRegistersTestCase {
+    std::string_view name;
+    uint16_t opcode;
+    std::array<uint8_t, 16> registers;
+    std::array<uint8_t, 16> memory;
+    std::array<uint8_t, 16> expectedRegisters;
+    std::array<uint8_t, 16> expectedMemory;
+};
+
+class TransferRegistersTest
+    : public testing::TestWithParam<TransferRegistersTestCase> {
+  protected:
+    std::array<uint8_t, 4096> prepareRam(ChipData &data) {
+        const auto &testCase = GetParam();
+        data.ram.fill(0xAA);
+
+        // Prepare RAM: 
+        std::copy(testCase.memory.begin(), testCase.memory.end(),
+                  data.ram.begin() + data.indexRegister);
+        
+        // Prepare expectedRam
+        auto expectedRam = data.ram;
+        std::copy(testCase.expectedMemory.begin(), testCase.expectedMemory.end(),
+                  expectedRam.begin() + data.indexRegister);
+        return expectedRam;
+    }
+};
+
+constexpr std::array<uint8_t, 16> transferValues{
+    0x12, 0x00, 0xFF, 0x34, 0x56, 0x78, 0x9A, 0xBC,
+    0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+constexpr auto transferRegistersCases = std::to_array<TransferRegistersTestCase>({
+    {"StoreSingleRegister", 0xF055, transferValues, {}, transferValues, {0x12}},
+    {"StoreMultipleRegisters", 0xF355, transferValues, {}, transferValues, {0x12, 0x00, 0xFF, 0x34}},
+    {"StoreAllRegisters", 0xFF55, transferValues, {}, transferValues, transferValues},
+    {"LoadSingleRegister", 0xF065, {}, transferValues, {0x12}, transferValues},
+    {"LoadMultipleRegisters", 0xF365, {}, transferValues, {0x12, 0x00, 0xFF, 0x34}, transferValues},
+    {"LoadAllRegisters", 0xFF65, {}, transferValues, transferValues, transferValues},
+});
+
+TEST_P(TransferRegistersTest, ExecuteCommand) {
+    const auto &testCase = GetParam();
+    ChipData data{};
+    Decoder decoder;
+    data.indexRegister = 0x300;
+    data.commonRegisters = testCase.registers;
+    const auto expectedRam = prepareRam(data);
+
+    auto command = decoder.decode(testCase.opcode);
+    command.execute(data);
+
+    EXPECT_EQ(data.commonRegisters, testCase.expectedRegisters);
+    EXPECT_EQ(data.ram, expectedRam);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MachineCode, TransferRegistersTest, testing::ValuesIn(transferRegistersCases),
+    [](const auto &info) { return std::string(info.param.name); });
 
 struct BinaryCodedDecimalTestCase {
     uint8_t value;
