@@ -182,6 +182,17 @@ class JumpToAddress {
     void execute(ChipData &data) { data.programCounter = address; }
 };
 
+class JumpWithOffset {
+  private:
+    uint16_t address{};
+
+  public:
+    JumpWithOffset(uint16_t command) : address(Opcode::FFF(command)) {}
+    void execute(ChipData &data) {
+        data.programCounter = address + data.commonRegisters[0];
+    }
+};
+
 class SaveToRegister {
   private:
     uint8_t registerIndex{};
@@ -394,7 +405,7 @@ class AssemblyCommand {
     using Storage = std::variant<ClearScreen, JumpToAddress, SaveToRegister,
                                  AddToRegister, SaveToIndexRegister, DrawSprite,
                                  TwoAddressInstruction, SkipIf, AddToIndexRegister,
-                                 StoreBinaryCodedDecimal>;
+                                 StoreBinaryCodedDecimal, JumpWithOffset>;
     Storage instruction;
 
   public:
@@ -445,6 +456,8 @@ class Decoder {
             return AssemblyCommand{TwoAddressInstruction{command}};
         case 0xA000:
             return AssemblyCommand{SaveToIndexRegister{command}};
+        case 0xB000:
+            return AssemblyCommand{JumpWithOffset{command}};
         case 0xD000:
             return AssemblyCommand{DrawSprite{command}};
         case 0xE000:
@@ -508,6 +521,7 @@ const auto decodingCases = std::to_array<DecodingTestCase>({
     {0x8127, matchesCommand<TwoAddressInstruction>},
     {0x812E, matchesCommand<TwoAddressInstruction>},
     {0xA111, matchesCommand<SaveToIndexRegister>},
+    {0xB123, matchesCommand<JumpWithOffset>},
     {0xD123, matchesCommand<DrawSprite>},
     {0xF31E, matchesCommand<AddToIndexRegister>},
     {0xF533, matchesCommand<StoreBinaryCodedDecimal>},
@@ -533,6 +547,12 @@ TEST(MachineCode, ExecuteCommand) {
     auto jumpToAddress = decoder.decode(0x1111);
     jumpToAddress.execute(data);
     ASSERT_EQ(data.programCounter, 0x0111);
+
+    data.commonRegisters[0] = 0x23;
+    auto jumpWithOffset = decoder.decode(0xB123);
+    jumpWithOffset.execute(data);
+    ASSERT_EQ(data.programCounter, 0x0146);
+    ASSERT_EQ(data.commonRegisters[0], 0x23);
 
     auto saveToRegister = decoder.decode(0x6111);
     saveToRegister.execute(data);
