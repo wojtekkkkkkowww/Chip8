@@ -1,11 +1,10 @@
 #include "ChipData.h"
 #include "Decoder.h"
-#include "Font.h"
 #include <gtest/gtest.h>
 
 namespace {
 
-TEST(MachineCode, ExecuteCommand) {
+TEST(MachineCode, ClearScreen) {
     Decoder decoder;
     ChipData data;
 
@@ -13,90 +12,67 @@ TEST(MachineCode, ExecuteCommand) {
     auto clearScreen = decoder.decode(0x00E0);
     clearScreen.execute(data);
     ASSERT_EQ(data.screen.get(0, 0), 0);
+}
+
+TEST(MachineCode, JumpToAddress) {
+    Decoder decoder;
+    ChipData data;
 
     auto jumpToAddress = decoder.decode(0x1111);
     jumpToAddress.execute(data);
     ASSERT_EQ(data.programCounter, 0x0111);
+}
+
+TEST(MachineCode, JumpWithOffset) {
+    Decoder decoder;
+    ChipData data;
 
     data.commonRegisters[0] = 0x23;
     auto jumpWithOffset = decoder.decode(0xB123);
     jumpWithOffset.execute(data);
     ASSERT_EQ(data.programCounter, 0x0146);
     ASSERT_EQ(data.commonRegisters[0], 0x23);
+}
+
+TEST(MachineCode, SaveToRegister) {
+    Decoder decoder;
+    ChipData data;
 
     auto saveToRegister = decoder.decode(0x6111);
     saveToRegister.execute(data);
     ASSERT_EQ(data.commonRegisters[0x01], 0x0011);
+}
+
+TEST(MachineCode, AddToRegister) {
+    Decoder decoder;
+    ChipData data;
+    data.commonRegisters[1] = 0x11;
 
     auto addToRegister = decoder.decode(0x7111);
     addToRegister.execute(data);
     ASSERT_EQ(data.commonRegisters[0x01], 0x0022);
+}
+
+TEST(MachineCode, SaveToIndexRegister) {
+    Decoder decoder;
+    ChipData data;
 
     auto saveToIndexRegister = decoder.decode(0xA111);
     saveToIndexRegister.execute(data);
     ASSERT_EQ(data.indexRegister, 0x0111);
+}
+
+TEST(MachineCode, AddToIndexRegister) {
+    Decoder decoder;
+    ChipData data;
+    data.indexRegister = 0x111;
+    data.commonRegisters[1] = 0x22;
 
     auto addToIndexRegister = decoder.decode(0xF11E);
     addToIndexRegister.execute(data);
     ASSERT_EQ(data.indexRegister, 0x0133);
     ASSERT_EQ(data.commonRegisters[0x01], 0x0022);
-
-    data.commonRegisters[3] = 60;
-    auto setDelayTimer = decoder.decode(0xF315);
-    setDelayTimer.execute(data);
-    ASSERT_EQ(data.delayTimer, 60);
-    ASSERT_EQ(data.commonRegisters[3], 60);
-    ASSERT_EQ(data.soundTimer, 0);
-
-    auto readDelayTimer = decoder.decode(0xF407);
-    readDelayTimer.execute(data);
-    ASSERT_EQ(data.commonRegisters[4], 60);
-    ASSERT_EQ(data.delayTimer, 60);
-
-    data.commonRegisters[5] = 30;
-    auto setSoundTimer = decoder.decode(0xF518);
-    setSoundTimer.execute(data);
-    ASSERT_EQ(data.soundTimer, 30);
-    ASSERT_EQ(data.commonRegisters[5], 30);
-    ASSERT_EQ(data.delayTimer, 60);
 }
-
-TEST(MachineCode, LoadFontIntoRam) {
-    ChipData data;
-    data.ram.fill(0xAA);
-    Font::loadInto(data.ram);
-
-    EXPECT_EQ(data.ram[0x4F], 0xAA);
-    EXPECT_EQ(data.ram[0xA0], 0xAA);
-    EXPECT_TRUE(std::equal(Font::DATA.begin(), Font::DATA.end(), data.ram.begin() + 0x50));
-}
-
-struct FontAddressTestCase {
-    uint8_t digit;
-    uint16_t expectedAddress;
-};
-
-class FontAddressTest : public testing::TestWithParam<FontAddressTestCase> {};
-
-TEST_P(FontAddressTest, ExecuteCommand) {
-    const auto &testCase = GetParam();
-    Decoder decoder;
-    ChipData data;
-    data.commonRegisters[3] = testCase.digit;
-
-    auto command = decoder.decode(0xF329);
-    command.execute(data);
-
-    EXPECT_EQ(data.indexRegister, testCase.expectedAddress);
-    EXPECT_EQ(data.commonRegisters[3], testCase.digit);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    MachineCode, FontAddressTest,
-    testing::Values(
-        FontAddressTestCase{0x0, 0x50},
-        FontAddressTestCase{0xA, 0x82},
-        FontAddressTestCase{0xF, 0x9B}));
 
 TEST(MachineCode, RandomInstructionSanityCheck) {
     Decoder decoder;
