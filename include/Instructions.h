@@ -112,6 +112,16 @@ class AddToRegister {
     void execute(ChipData &data);
 };
 
+class Random {
+  private:
+    uint8_t registerIndex{};
+    uint8_t mask{};
+
+  public:
+    Random(uint16_t command);
+    void execute(ChipData &data);
+};
+
 class ReadDelayTimer {
   private:
     uint8_t registerIndex{};

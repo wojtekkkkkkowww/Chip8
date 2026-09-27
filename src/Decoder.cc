@@ -34,6 +34,8 @@ AssemblyCommand Decoder::decode(uint16_t command) {
         return AssemblyCommand{SaveToIndexRegister{command}};
     case 0xB000:
         return AssemblyCommand{JumpWithOffset{command}};
+    case 0xC000:
+        return AssemblyCommand{Random{command}};
     case 0xD000:
         return AssemblyCommand{DrawSprite{command}};
     case 0xE000:

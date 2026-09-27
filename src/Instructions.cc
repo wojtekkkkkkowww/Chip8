@@ -112,6 +112,15 @@ void AddToRegister::execute(ChipData &data) {
     data.commonRegisters[registerIndex] += value;
 }
 
+Random::Random(uint16_t command)
+    : registerIndex(Opcode::F00(command)), mask(Opcode::FF(command)) {}
+
+void Random::execute(ChipData &data) {
+    std::uniform_int_distribution<unsigned int> distribution{0, 255};
+    data.commonRegisters[registerIndex] =
+        static_cast<uint8_t>(distribution(data.randomGenerator) & mask);
+}
+
 ReadDelayTimer::ReadDelayTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
 
 void ReadDelayTimer::execute(ChipData &data) {

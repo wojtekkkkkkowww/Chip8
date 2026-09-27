@@ -60,4 +60,18 @@ TEST(MachineCode, ExecuteCommand) {
     ASSERT_EQ(data.delayTimer, 60);
 }
 
+TEST(MachineCode, RandomInstructionSanityCheck) {
+    Decoder decoder;
+    ChipData data;
+    data.randomGenerator.seed(123);
+
+    std::mt19937 referenceGenerator{123};
+    std::uniform_int_distribution<unsigned int> distribution{0, 255};
+    const auto expected = distribution(referenceGenerator) & 0x0F;
+
+    auto random = decoder.decode(0xC30F);
+    random.execute(data);
+    EXPECT_EQ(data.commonRegisters[3], expected);
+}
+
 } // namespace

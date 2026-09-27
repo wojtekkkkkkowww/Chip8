@@ -3,6 +3,7 @@
 #include "MonoScreen.h"
 #include <array>
 #include <cstdint>
+#include <random>
 
 struct ChipData {
     std::array<uint8_t, 4096> ram{};
@@ -12,5 +13,6 @@ struct ChipData {
     uint16_t programCounter{};
     uint8_t delayTimer{};
     uint8_t soundTimer{};
+    std::mt19937 randomGenerator{std::random_device{}()};
     MonoScreen screen;
 };
