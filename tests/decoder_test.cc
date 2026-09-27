@@ -29,6 +29,8 @@ bool matchesCommand(const AssemblyCommand &command) {
 
 const auto decodingCases = std::to_array<DecodingTestCase>({
     {0x00E0, matchesCommand<ClearScreen>},
+    {0x00EE, matchesCommand<ReturnFromSubroutine>},
+    {0x2345, matchesCommand<CallSubroutine>},
     {0x1111, matchesCommand<JumpToAddress>},
     {0x3123, matchesCommand<SkipIf>},
     {0x4123, matchesCommand<SkipIf>},

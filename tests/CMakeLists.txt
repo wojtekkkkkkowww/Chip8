@@ -4,6 +4,7 @@ add_executable(chip8_tests
     basic_instructions_test.cc
     font_test.cc
     timer_instructions_test.cc
+    subroutine_instructions_test.cc
     arithmetic_instructions_test.cc
     skip_instructions_test.cc
     memory_instructions_test.cc

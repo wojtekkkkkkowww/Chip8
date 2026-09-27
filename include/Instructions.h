@@ -37,6 +37,20 @@ class JumpToAddress {
     void execute(ChipData &data);
 };
 
+class CallSubroutine {
+  private:
+    uint16_t address{};
+
+  public:
+    CallSubroutine(uint16_t command);
+    void execute(ChipData &data);
+};
+
+class ReturnFromSubroutine {
+  public:
+    void execute(ChipData &data);
+};
+
 class JumpWithOffset {
   private:
     uint16_t address{};

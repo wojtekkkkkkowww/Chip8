@@ -7,9 +7,13 @@ AssemblyCommand Decoder::decode(uint16_t command) {
     case 0x0000:
         if(command == 0x00E0)
             return AssemblyCommand{ClearScreen{}};
+        if(command == 0x00EE)
+            return AssemblyCommand{ReturnFromSubroutine{}};
         break;
     case 0x1000:
         return AssemblyCommand{JumpToAddress{command}};
+    case 0x2000:
+        return AssemblyCommand{CallSubroutine{command}};
     case 0x3000:
         return AssemblyCommand{SkipIf{command, SkipCondition::EqualToValue}};
     case 0x4000:

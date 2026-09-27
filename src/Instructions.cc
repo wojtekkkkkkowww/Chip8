@@ -62,6 +62,25 @@ JumpToAddress::JumpToAddress(uint16_t command) : address(Opcode::FFF(command)) {
 
 void JumpToAddress::execute(ChipData &data) { data.programCounter = address; }
 
+CallSubroutine::CallSubroutine(uint16_t command) : address(Opcode::FFF(command)) {}
+
+void CallSubroutine::execute(ChipData &data) {
+    if(data.stackPointer >= data.stack.size())
+        throw std::overflow_error("Chip-8 stack overflow");
+
+    // Fetch advances PC before execution, so it already holds the return address.
+    data.stack[data.stackPointer++] = data.programCounter;
+    data.programCounter = address;
+}
+
+void ReturnFromSubroutine::execute(ChipData &data) {
+    if(data.stackPointer == 0)
+        throw std::underflow_error("Chip-8 stack underflow");
+
+    --data.stackPointer;
+    data.programCounter = data.stack.at(data.stackPointer);
+}
+
 JumpWithOffset::JumpWithOffset(uint16_t command) : address(Opcode::FFF(command)) {}
 
 void JumpWithOffset::execute(ChipData &data) {
