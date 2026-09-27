@@ -112,6 +112,24 @@ void AddToRegister::execute(ChipData &data) {
     data.commonRegisters[registerIndex] += value;
 }
 
+ReadDelayTimer::ReadDelayTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
+
+void ReadDelayTimer::execute(ChipData &data) {
+    data.commonRegisters[registerIndex] = data.delayTimer;
+}
+
+SetDelayTimer::SetDelayTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
+
+void SetDelayTimer::execute(ChipData &data) {
+    data.delayTimer = data.commonRegisters[registerIndex];
+}
+
+SetSoundTimer::SetSoundTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
+
+void SetSoundTimer::execute(ChipData &data) {
+    data.soundTimer = data.commonRegisters[registerIndex];
+}
+
 TwoAddressInstruction::TwoAddressInstruction(uint16_t command)
     : xRegisterIndex(Opcode::F00(command)), yRegisterIndex(Opcode::F0(command)),
       operationType(Opcode::F(command)) {}

@@ -11,7 +11,8 @@ class AssemblyCommand {
                                  AddToRegister, SaveToIndexRegister, DrawSprite,
                                  TwoAddressInstruction, SkipIf, AddToIndexRegister,
                                  StoreBinaryCodedDecimal, JumpWithOffset,
-                                 TransferRegisters>;
+                                 TransferRegisters, ReadDelayTimer,
+                                 SetDelayTimer, SetSoundTimer>;
     Storage instruction;
 
   public:

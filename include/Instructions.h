@@ -112,6 +112,33 @@ class AddToRegister {
     void execute(ChipData &data);
 };
 
+class ReadDelayTimer {
+  private:
+    uint8_t registerIndex{};
+
+  public:
+    ReadDelayTimer(uint16_t command);
+    void execute(ChipData &data);
+};
+
+class SetDelayTimer {
+  private:
+    uint8_t registerIndex{};
+
+  public:
+    SetDelayTimer(uint16_t command);
+    void execute(ChipData &data);
+};
+
+class SetSoundTimer {
+  private:
+    uint8_t registerIndex{};
+
+  public:
+    SetSoundTimer(uint16_t command);
+    void execute(ChipData &data);
+};
+
 class TwoAddressInstruction {
   private:
     uint8_t xRegisterIndex{};

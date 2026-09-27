@@ -45,6 +45,12 @@ AssemblyCommand Decoder::decode(uint16_t command) {
                 SkipIf{command, SkipCondition::KeyNotPressed}};
         break;
     case 0xF000:
+        if(Opcode::FF(command) == 0x07)
+            return AssemblyCommand{ReadDelayTimer{command}};
+        if(Opcode::FF(command) == 0x15)
+            return AssemblyCommand{SetDelayTimer{command}};
+        if(Opcode::FF(command) == 0x18)
+            return AssemblyCommand{SetSoundTimer{command}};
         if(Opcode::FF(command) == 0x1E)
             return AssemblyCommand{AddToIndexRegister{command}};
         if(Opcode::FF(command) == 0x33)
