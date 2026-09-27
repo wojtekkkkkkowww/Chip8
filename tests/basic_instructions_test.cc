@@ -1,5 +1,6 @@
 #include "ChipData.h"
 #include "Decoder.h"
+#include "Font.h"
 #include <gtest/gtest.h>
 
 namespace {
@@ -59,6 +60,43 @@ TEST(MachineCode, ExecuteCommand) {
     ASSERT_EQ(data.commonRegisters[5], 30);
     ASSERT_EQ(data.delayTimer, 60);
 }
+
+TEST(MachineCode, LoadFontIntoRam) {
+    ChipData data;
+    data.ram.fill(0xAA);
+    Font::loadInto(data.ram);
+
+    EXPECT_EQ(data.ram[0x4F], 0xAA);
+    EXPECT_EQ(data.ram[0xA0], 0xAA);
+    EXPECT_TRUE(std::equal(Font::DATA.begin(), Font::DATA.end(), data.ram.begin() + 0x50));
+}
+
+struct FontAddressTestCase {
+    uint8_t digit;
+    uint16_t expectedAddress;
+};
+
+class FontAddressTest : public testing::TestWithParam<FontAddressTestCase> {};
+
+TEST_P(FontAddressTest, ExecuteCommand) {
+    const auto &testCase = GetParam();
+    Decoder decoder;
+    ChipData data;
+    data.commonRegisters[3] = testCase.digit;
+
+    auto command = decoder.decode(0xF329);
+    command.execute(data);
+
+    EXPECT_EQ(data.indexRegister, testCase.expectedAddress);
+    EXPECT_EQ(data.commonRegisters[3], testCase.digit);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MachineCode, FontAddressTest,
+    testing::Values(
+        FontAddressTestCase{0x0, 0x50},
+        FontAddressTestCase{0xA, 0x82},
+        FontAddressTestCase{0xF, 0x9B}));
 
 TEST(MachineCode, RandomInstructionSanityCheck) {
     Decoder decoder;

@@ -57,6 +57,8 @@ AssemblyCommand Decoder::decode(uint16_t command) {
             return AssemblyCommand{AddToIndexRegister{command}};
         if(Opcode::FF(command) == 0x33)
             return AssemblyCommand{StoreBinaryCodedDecimal{command}};
+        if(Opcode::FF(command) == 0x29)
+            return AssemblyCommand{SetFontAddress{command}};
         if(Opcode::FF(command) == 0x55)
             return AssemblyCommand{
                 TransferRegisters{command, RegisterTransferDirection::Store}};

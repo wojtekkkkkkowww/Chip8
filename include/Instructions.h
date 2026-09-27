@@ -112,6 +112,15 @@ class AddToRegister {
     void execute(ChipData &data);
 };
 
+class SetFontAddress {
+  private:
+    uint8_t registerIndex{};
+
+  public:
+    SetFontAddress(uint16_t command);
+    void execute(ChipData &data);
+};
+
 class Random {
   private:
     uint8_t registerIndex{};

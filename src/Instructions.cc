@@ -1,5 +1,6 @@
 #include "Instructions.h"
 #include "ChipData.h"
+#include "Font.h"
 #include "Opcode.h"
 #include <cstddef>
 #include <stdexcept>
@@ -110,6 +111,13 @@ AddToRegister::AddToRegister(uint16_t command)
 
 void AddToRegister::execute(ChipData &data) {
     data.commonRegisters[registerIndex] += value;
+}
+
+SetFontAddress::SetFontAddress(uint16_t command) : registerIndex(Opcode::F00(command)) {}
+
+void SetFontAddress::execute(ChipData &data) {
+    data.indexRegister = static_cast<uint16_t>(
+        Font::START_ADDRESS + data.commonRegisters[registerIndex] * Font::BYTES_PER_GLYPH);
 }
 
 Random::Random(uint16_t command)

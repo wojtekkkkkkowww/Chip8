@@ -12,7 +12,7 @@ class AssemblyCommand {
                                  TwoAddressInstruction, SkipIf, AddToIndexRegister,
                                  StoreBinaryCodedDecimal, JumpWithOffset,
                                  TransferRegisters, ReadDelayTimer,
-                                 SetDelayTimer, SetSoundTimer, Random>;
+                                 SetDelayTimer, SetSoundTimer, Random, SetFontAddress>;
     Storage instruction;
 
   public:
