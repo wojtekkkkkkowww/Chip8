@@ -2,6 +2,7 @@ add_executable(chip8_tests
     screen_test.cc
     decoder_test.cc
     basic_instructions_test.cc
+    chip8_test.cc
     font_test.cc
     timer_instructions_test.cc
     subroutine_instructions_test.cc

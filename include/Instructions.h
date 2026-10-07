@@ -182,3 +182,12 @@ class TwoAddressInstruction {
     TwoAddressInstruction(uint16_t command);
     void execute(ChipData &data);
 };
+
+class WaitForKey {
+  private:
+    uint8_t registerIndex{};
+
+  public:
+    WaitForKey(uint16_t command);
+    void execute(ChipData &data);
+};

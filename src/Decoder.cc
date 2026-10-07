@@ -51,6 +51,8 @@ AssemblyCommand Decoder::decode(uint16_t command) {
                 SkipIf{command, SkipCondition::KeyNotPressed}};
         break;
     case 0xF000:
+        if(Opcode::FF(command) == 0x0A)
+            return AssemblyCommand{WaitForKey{command}};
         if(Opcode::FF(command) == 0x07)
             return AssemblyCommand{ReadDelayTimer{command}};
         if(Opcode::FF(command) == 0x15)

@@ -13,7 +13,7 @@ class AssemblyCommand {
                                  StoreBinaryCodedDecimal, JumpWithOffset,
                                  TransferRegisters, ReadDelayTimer,
                                  SetDelayTimer, SetSoundTimer, Random, SetFontAddress,
-                                 CallSubroutine, ReturnFromSubroutine>;
+                                 CallSubroutine, ReturnFromSubroutine, WaitForKey>;
     Storage instruction;
 
   public:

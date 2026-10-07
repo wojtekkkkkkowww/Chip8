@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 namespace {
-
 TEST(MachineCode, ClearScreen) {
     Decoder decoder;
     ChipData data;

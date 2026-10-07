@@ -52,6 +52,7 @@ const auto decodingCases = std::to_array<DecodingTestCase>({
     {0xA111, matchesCommand<SaveToIndexRegister>},
     {0xB123, matchesCommand<JumpWithOffset>},
     {0xD123, matchesCommand<DrawSprite>},
+    {0xF30A, matchesCommand<WaitForKey>},
     {0xF31E, matchesCommand<AddToIndexRegister>},
     {0xF533, matchesCommand<StoreBinaryCodedDecimal>},
     {0xF355, matchesCommand<TransferRegisters>},

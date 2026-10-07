@@ -55,7 +55,7 @@ TEST_P(SkipIfTest, ExecuteCommand) {
     }
     if(const auto *keyData = std::get_if<KeyData>(&testCase.data)) {
         data.commonRegisters[1] = keyData->keyIndex;
-        data.keyboard[keyData->keyIndex] = keyData->pressed;
+        data.keyboard.keys[keyData->keyIndex] = keyData->pressed;
     }
 
     auto command = decoder.decode(testCase.opcode);

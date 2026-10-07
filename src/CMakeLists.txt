@@ -1,4 +1,5 @@
 add_library(Chip8 STATIC
+    Chip8.cc
     MonoScreen.cc
     Instructions.cc
     DrawSprite.cc

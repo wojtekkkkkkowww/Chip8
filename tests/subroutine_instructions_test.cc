@@ -13,22 +13,22 @@ TEST(SubroutineInstructions, CallSavesReturnAddressAndJumps) {
     auto command = decoder.decode(0x2345);
     command.execute(data);
 
-    EXPECT_EQ(data.stack[0], 0x202);
-    EXPECT_EQ(data.stackPointer, 1);
+    EXPECT_EQ(data.stack.addresses[0], 0x202);
+    EXPECT_EQ(data.stack.pointer, 1);
     EXPECT_EQ(data.programCounter, 0x345);
 }
 
 TEST(SubroutineInstructions, ReturnPopsAddress) {
     ChipData data;
     Decoder decoder;
-    data.stack[0] = 0x202;
-    data.stackPointer = 1;
+    data.stack.addresses[0] = 0x202;
+    data.stack.pointer = 1;
     data.programCounter = 0x346;
 
     auto command = decoder.decode(0x00EE);
     command.execute(data);
 
-    EXPECT_EQ(data.stackPointer, 0);
+    EXPECT_EQ(data.stack.pointer, 0);
     EXPECT_EQ(data.programCounter, 0x202);
 }
 
@@ -44,48 +44,48 @@ TEST(SubroutineInstructions, NestedCallsReturnInReverseOrder) {
     data.programCounter = 0x304; // Simulate fetching the nested call.
     innerCall.execute(data);     // Jump to 0x400; push 0x302
 
-    ASSERT_EQ(data.stackPointer, 2);
+    ASSERT_EQ(data.stack.pointer, 2);
     EXPECT_EQ(data.programCounter, 0x400);
 
     returnCommand.execute(data);
     EXPECT_EQ(data.programCounter, 0x304);
-    EXPECT_EQ(data.stackPointer, 1);
+    EXPECT_EQ(data.stack.pointer, 1);
 
     returnCommand.execute(data);
     EXPECT_EQ(data.programCounter, 0x202);
-    EXPECT_EQ(data.stackPointer, 0);
+    EXPECT_EQ(data.stack.pointer, 0);
 }
 
 TEST(SubroutineInstructions, LastStackSlotIsUsable) {
     ChipData data;
     Decoder decoder;
-    data.stackPointer = 15;
+    data.stack.pointer = 15;
     data.programCounter = 0xABC;
 
     auto call = decoder.decode(0x2300);
     call.execute(data);
-    EXPECT_EQ(data.stack[15], 0xABC);
-    EXPECT_EQ(data.stackPointer, 16);
+    EXPECT_EQ(data.stack.addresses[15], 0xABC);
+    EXPECT_EQ(data.stack.pointer, 16);
     EXPECT_EQ(data.programCounter, 0x300);
 
     auto returnCommand = decoder.decode(0x00EE);
     returnCommand.execute(data);
-    EXPECT_EQ(data.stackPointer, 15);
+    EXPECT_EQ(data.stack.pointer, 15);
     EXPECT_EQ(data.programCounter, 0xABC);
 }
 
 TEST(SubroutineInstructions, FullStackRejectsCallWithoutChangingState) {
     ChipData data;
     Decoder decoder;
-    data.stack.fill(0xABC);
-    data.stackPointer = 16;
+    data.stack.addresses.fill(0xABC);
+    data.stack.pointer = 16;
     data.programCounter = 0x202;
-    const auto originalStack = data.stack;
+    const auto originalStack = data.stack.addresses;
 
     auto command = decoder.decode(0x2300);
     EXPECT_THROW(command.execute(data), std::overflow_error);
-    EXPECT_EQ(data.stack, originalStack);
-    EXPECT_EQ(data.stackPointer, 16);
+    EXPECT_EQ(data.stack.addresses, originalStack);
+    EXPECT_EQ(data.stack.pointer, 16);
     EXPECT_EQ(data.programCounter, 0x202);
 }
 
@@ -93,12 +93,12 @@ TEST(SubroutineInstructions, EmptyStackRejectsReturnWithoutChangingState) {
     ChipData data;
     Decoder decoder;
     data.programCounter = 0x202;
-    const auto originalStack = data.stack;
+    const auto originalStack = data.stack.addresses;
 
     auto command = decoder.decode(0x00EE);
     EXPECT_THROW(command.execute(data), std::underflow_error);
-    EXPECT_EQ(data.stack, originalStack);
-    EXPECT_EQ(data.stackPointer, 0);
+    EXPECT_EQ(data.stack.addresses, originalStack);
+    EXPECT_EQ(data.stack.pointer, 0);
     EXPECT_EQ(data.programCounter, 0x202);
 }
 

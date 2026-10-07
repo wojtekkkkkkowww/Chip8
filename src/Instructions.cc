@@ -34,12 +34,12 @@ void SkipIf::execute(ChipData &data) {
         case SkipCondition::KeyPressed: {
             uint8_t xRegisterIndex = Opcode::F00(opcode);
             uint8_t keyIndex = Opcode::F(data.commonRegisters[xRegisterIndex]);
-            return static_cast<bool>(data.keyboard[keyIndex]);
+            return static_cast<bool>(data.keyboard.keys[keyIndex]);
         }
         case SkipCondition::KeyNotPressed: {
             uint8_t xRegisterIndex = Opcode::F00(opcode);
             uint8_t keyIndex = Opcode::F(data.commonRegisters[xRegisterIndex]);
-            return not static_cast<bool>(data.keyboard[keyIndex]);
+            return not static_cast<bool>(data.keyboard.keys[keyIndex]);
         }
         default:
             return false;
@@ -65,20 +65,20 @@ void JumpToAddress::execute(ChipData &data) { data.programCounter = address; }
 CallSubroutine::CallSubroutine(uint16_t command) : address(Opcode::FFF(command)) {}
 
 void CallSubroutine::execute(ChipData &data) {
-    if(data.stackPointer >= data.stack.size())
+    if(data.stack.pointer >= data.stack.addresses.size())
         throw std::overflow_error("Chip-8 stack overflow");
 
     // Fetch advances PC before execution, so it already holds the return address.
-    data.stack[data.stackPointer++] = data.programCounter;
+    data.stack.addresses[data.stack.pointer++] = data.programCounter;
     data.programCounter = address;
 }
 
 void ReturnFromSubroutine::execute(ChipData &data) {
-    if(data.stackPointer == 0)
+    if(data.stack.pointer == 0)
         throw std::underflow_error("Chip-8 stack underflow");
 
-    --data.stackPointer;
-    data.programCounter = data.stack.at(data.stackPointer);
+    --data.stack.pointer;
+    data.programCounter = data.stack.addresses.at(data.stack.pointer);
 }
 
 JumpWithOffset::JumpWithOffset(uint16_t command) : address(Opcode::FFF(command)) {}
@@ -151,19 +151,19 @@ void Random::execute(ChipData &data) {
 ReadDelayTimer::ReadDelayTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
 
 void ReadDelayTimer::execute(ChipData &data) {
-    data.commonRegisters[registerIndex] = data.delayTimer;
+    data.commonRegisters[registerIndex] = data.timers.delay;
 }
 
 SetDelayTimer::SetDelayTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
 
 void SetDelayTimer::execute(ChipData &data) {
-    data.delayTimer = data.commonRegisters[registerIndex];
+    data.timers.delay = data.commonRegisters[registerIndex];
 }
 
 SetSoundTimer::SetSoundTimer(uint16_t command) : registerIndex(Opcode::F00(command)) {}
 
 void SetSoundTimer::execute(ChipData &data) {
-    data.soundTimer = data.commonRegisters[registerIndex];
+    data.timers.sound = data.commonRegisters[registerIndex];
 }
 
 TwoAddressInstruction::TwoAddressInstruction(uint16_t command)
@@ -233,5 +233,18 @@ void TwoAddressInstruction::execute(ChipData &data) {
     default: {
         throw std::logic_error("Unknown operation");
     }
+    }
+}
+
+WaitForKey::WaitForKey(uint16_t command) : registerIndex(Opcode::F00(command)) {}
+
+void WaitForKey::execute(ChipData &data) {
+    data.keyboard.waitingRegister = registerIndex;
+    if(data.keyboard.releasedKey.has_value()) {
+        data.commonRegisters[registerIndex] = *data.keyboard.releasedKey;
+        data.keyboard.releasedKey.reset();
+        data.keyboard.waitingRegister.reset();
+    } else {
+        data.programCounter -= 2;
     }
 }
