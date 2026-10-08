@@ -1,6 +1,11 @@
 #include "Chip8.h"
+#include "Font.h"
 #include <algorithm>
 #include <stdexcept>
+
+Chip8::Chip8() {
+    Font::loadInto(data.ram);
+}
 
 void Chip8::loadToRam(std::span<const uint8_t> rom) {
     if(rom.size() > data.ram.size() - PROGRAM_START)

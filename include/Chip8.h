@@ -12,6 +12,7 @@ class Chip8 {
     static constexpr uint16_t PROGRAM_START = 0x200;
 
   public:
+    Chip8();
     void loadToRam(std::span<const uint8_t> rom);
     void makeStep();
     void setKey(uint8_t keyHex, bool pressed);

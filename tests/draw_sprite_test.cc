@@ -1,11 +1,10 @@
 #include "ChipData.h"
 #include "Decoder.h"
 #include "Opcode.h"
-#include <algorithm>
+#include "test_helpers.h"
 #include <array>
 #include <cstdint>
 #include <gtest/gtest.h>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,26 +19,7 @@ struct DrawSpriteTestCase {
     uint8_t startingXPosition{};
     uint8_t startingYPosition{};
 };
-class DrawSpriteTest : public testing::TestWithParam<DrawSpriteTestCase> {
-  protected:
-    std::string readSprite(uint8_t xPosition, uint8_t yPosition, uint8_t rows,
-                           const MonoScreen &screen) {
-        std::string line{};
-        std::string sprite{};
-        std::stringstream screenStream{};
-        screenStream << screen;
-        size_t index{0};
-        while(std::getline(screenStream, line) and
-              (std::count(sprite.begin(), sprite.end(), '\n') < rows)) {
-            if(index >= yPosition) {
-                sprite.append(line.substr(xPosition, 8));
-                sprite.push_back('\n');
-            }
-            index++;
-        }
-        return sprite;
-    }
-};
+class DrawSpriteTest : public testing::TestWithParam<DrawSpriteTestCase> {};
 
 TEST_P(DrawSpriteTest, DrawSprite) {
     Decoder decoder;
@@ -62,7 +42,8 @@ TEST_P(DrawSpriteTest, DrawSprite) {
     auto drawSprite = decoder.decode(testCase.opcode);
     drawSprite.execute(data);
 
-    auto fetchedSprite = readSprite(xPosition, yPosition, rowCount, data.screen);
+    const auto fetchedSprite = screen_test_helpers::readSprite(
+        data.screen, xPosition, yPosition, rowCount);
 
     ASSERT_EQ(testCase.expectedSpriteString, fetchedSprite);
     ASSERT_EQ(data.commonRegisters[0xF], 0);
@@ -70,16 +51,7 @@ TEST_P(DrawSpriteTest, DrawSprite) {
     // clear screen with the same sprite
     drawSprite.execute(data);
 
-    auto expectedSprite = [&testCase]() {
-        std::string result{};
-        for(size_t i = 0; i < testCase.sprite.size(); i++) {
-            result.append("OOOOOOOO\n");
-        }
-        return result;
-    }();
-    fetchedSprite = readSprite(xPosition, yPosition, rowCount, data.screen);
-
-    ASSERT_EQ(expectedSprite, fetchedSprite);
+    ASSERT_TRUE(screen_test_helpers::isScreenEmpty(data.screen));
     ASSERT_EQ(data.commonRegisters[0xF], 1);
 }
 

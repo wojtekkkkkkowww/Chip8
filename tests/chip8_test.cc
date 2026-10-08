@@ -1,4 +1,5 @@
 #include "Chip8.h"
+#include "test_helpers.h"
 #include <array>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -49,6 +50,37 @@ TEST(Chip8Integration, WaitForKey) {
     chip8.makeStep(); // Normal execution resumes: add 1 to V3.
     ASSERT_EQ(data.commonRegisters[keyRegister], key + 1);
     ASSERT_EQ(data.programCounter, waitAddress + 6);
+}
+
+TEST(Chip8Integration, drawBuiltInFont) {
+    Chip8 chip8;
+    constexpr std::array<uint8_t, 12> rom{
+        0x60, 0x04, // 0x6004: Set V0 to the x coordinate, 4.
+        0x61, 0x02, // 0x6102: Set V1 to the y coordinate, 2.
+        0x62, 0x0A, // 0x620A: Select the hexadecimal digit A.
+        0xF2, 0x29, // 0xF229: Set I to the built-in glyph for V2.
+        0xD0, 0x15, // 0xD015: Draw five rows at (V0, V1).
+        0x00, 0xE0  // 0x00E0: Clear the screen.
+    };
+    chip8.loadToRam(rom);
+    const auto &data = chip8.getData();
+    ASSERT_TRUE(screen_test_helpers::isScreenEmpty(data.screen));
+
+    for(int step = 0; step < 5; ++step)
+        chip8.makeStep();
+
+    EXPECT_EQ(screen_test_helpers::readSprite(data.screen, 4, 2, 5),
+              "####OOOO\n"
+              "#OO#OOOO\n"
+              "####OOOO\n"
+              "#OO#OOOO\n"
+              "#OO#OOOO\n");
+    EXPECT_EQ(data.commonRegisters[0xF], 0);
+    EXPECT_EQ(data.programCounter, 0x20A);
+
+    chip8.makeStep();
+    EXPECT_TRUE(screen_test_helpers::isScreenEmpty(data.screen));
+    EXPECT_EQ(data.programCounter, 0x20C);
 }
 
 } // namespace
