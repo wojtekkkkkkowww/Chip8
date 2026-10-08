@@ -83,4 +83,48 @@ TEST(Chip8Integration, drawBuiltInFont) {
     EXPECT_EQ(data.programCounter, 0x20C);
 }
 
+TEST(Chip8Integration, NestedCallsReturnToTheirCallers) {
+    Chip8 chip8;
+    constexpr std::array<uint8_t, 14> rom{
+        0x22, 0x04, // 0x200: Call subroutine A at 0x204.
+        0x70, 0x01, // 0x202: Main increments V0 after A returns.
+        0x22, 0x0A, // 0x204: A calls subroutine B at 0x20A.
+        0x71, 0x02, // 0x206: A adds 2 to V1 after B returns.
+        0x00, 0xEE, // 0x208: Return from A to main.
+        0x72, 0x03, // 0x20A: B adds 3 to V2.
+        0x00, 0xEE  // 0x20C: Return from B to A.
+    };
+    chip8.loadToRam(rom);
+    const auto &data = chip8.getData();
+
+    chip8.makeStep(); // Main calls A.
+    ASSERT_EQ(data.programCounter, 0x204);
+    ASSERT_EQ(data.stack.pointer, 1);
+    ASSERT_EQ(data.stack.addresses[0], 0x202);
+
+    chip8.makeStep(); // A calls B.
+    ASSERT_EQ(data.programCounter, 0x20A);
+    ASSERT_EQ(data.stack.pointer, 2);
+    ASSERT_EQ(data.stack.addresses[0], 0x202);
+    ASSERT_EQ(data.stack.addresses[1], 0x206);
+
+    chip8.makeStep(); // B updates V2.
+    chip8.makeStep(); // B returns to A.
+    ASSERT_EQ(data.programCounter, 0x206);
+    ASSERT_EQ(data.stack.pointer, 1);
+    ASSERT_EQ(data.stack.addresses[0], 0x202);
+
+    chip8.makeStep(); // A updates V1.
+    chip8.makeStep(); // A returns to main.
+    ASSERT_EQ(data.programCounter, 0x202);
+    ASSERT_EQ(data.stack.pointer, 0);
+
+    chip8.makeStep(); // Main updates V0.
+    EXPECT_EQ(data.commonRegisters[0], 1);
+    EXPECT_EQ(data.commonRegisters[1], 2);
+    EXPECT_EQ(data.commonRegisters[2], 3);
+    EXPECT_EQ(data.programCounter, 0x204);
+    EXPECT_EQ(data.stack.pointer, 0);
+}
+
 } // namespace
