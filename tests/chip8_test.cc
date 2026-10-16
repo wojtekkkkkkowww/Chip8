@@ -127,4 +127,31 @@ TEST(Chip8Integration, NestedCallsReturnToTheirCallers) {
     EXPECT_EQ(data.stack.pointer, 0);
 }
 
+TEST(Chip8Integration, LoopWithConditionalSkip) {
+    // Pseudocode:
+    // V0 = 0
+    // loop:
+    //     V0 += 1
+    //     if V0 == 3, skip the next instruction
+    //     jump to loop
+    // V1 = 0xAA
+    Chip8 chip8;
+    constexpr std::array<uint8_t, 10> rom{
+        0x60, 0x00, // 0x200: Set V0 to 0.
+        0x70, 0x01, // 0x202: Increment V0.
+        0x30, 0x03, // 0x204: Skip the jump when V0 equals 3.
+        0x12, 0x02, // 0x206: Jump back to the increment.
+        0x61, 0xAA  // 0x208: Mark that the loop has finished.
+    };
+    chip8.loadToRam(rom);
+
+    for(int step = 0; step < 10; ++step)
+        chip8.makeStep();
+
+    const auto &data = chip8.getData();
+    EXPECT_EQ(data.commonRegisters[0], 3);
+    EXPECT_EQ(data.commonRegisters[1], 0xAA);
+    EXPECT_EQ(data.programCounter, 0x20A);
+}
+
 } // namespace
