@@ -114,6 +114,7 @@ void TransferRegisters::execute(ChipData &data) {
         else
             data.commonRegisters[i] = data.ram.at(data.indexRegister + i);
     }
+    data.indexRegister = static_cast<uint16_t>(data.indexRegister + registerIndex + 1);
 }
 
 StoreBinaryCodedDecimal::StoreBinaryCodedDecimal(uint16_t command) : registerIndex(Opcode::F00(command)) {}

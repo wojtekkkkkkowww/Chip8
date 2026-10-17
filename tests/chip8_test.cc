@@ -154,4 +154,52 @@ TEST(Chip8Integration, LoopWithConditionalSkip) {
     EXPECT_EQ(data.programCounter, 0x20A);
 }
 
+TEST(Chip8Integration, SaveAndReadFromRam) {
+    // Pseudocode:
+    // V0 = 0x12, V1 = 0x34, V2 = 0x56
+    // I = 0x300
+    // Store V0-V2 in RAM using Fx55.
+    // V0 = 0, V1 = 0, V2 = 0
+    // I = 0x300
+    // Restore V0-V2 from RAM using Fx65.
+    Chip8 chip8;
+    constexpr std::array<uint8_t, 20> rom{
+        0x60, 0x12, // 0x200: Set V0 to 0x12.
+        0x61, 0x34, // 0x202: Set V1 to 0x34.
+        0x62, 0x56, // 0x204: Set V2 to 0x56.
+        0xA3, 0x00, // 0x206: Set I to 0x300.
+        0xF2, 0x55, // 0x208: Store V0-V2 in RAM.
+        0x60, 0x00, // 0x20A: Clear V0.
+        0x61, 0x00, // 0x20C: Clear V1.
+        0x62, 0x00, // 0x20E: Clear V2.
+        0xA3, 0x00, // 0x210: Reset I to 0x300.
+        0xF2, 0x65  // 0x212: Restore V0-V2 from RAM.
+    };
+    chip8.loadToRam(rom);
+    const auto &data = chip8.getData();
+
+    for(int step = 0; step < 5; ++step)
+        chip8.makeStep();
+
+    EXPECT_EQ(data.ram[0x300], 0x12);
+    EXPECT_EQ(data.ram[0x301], 0x34);
+    EXPECT_EQ(data.ram[0x302], 0x56);
+
+    for(int step = 0; step < 3; ++step)
+        chip8.makeStep();
+
+    ASSERT_EQ(data.commonRegisters[0], 0);
+    ASSERT_EQ(data.commonRegisters[1], 0);
+    ASSERT_EQ(data.commonRegisters[2], 0);
+    ASSERT_EQ(data.indexRegister, 0x303); // Fx55 advances I by x + 1 (three bytes).
+    chip8.makeStep(); // Reset I.
+    chip8.makeStep(); // Restore registers.
+
+    EXPECT_EQ(data.commonRegisters[0], 0x12);
+    EXPECT_EQ(data.commonRegisters[1], 0x34);
+    EXPECT_EQ(data.commonRegisters[2], 0x56);
+    EXPECT_EQ(data.indexRegister, 0x303); // Fx65 also advances I by three bytes.
+    EXPECT_EQ(data.programCounter, 0x214);
+}
+
 } // namespace
