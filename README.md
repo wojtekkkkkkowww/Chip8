@@ -2,6 +2,8 @@
 
 A CHIP-8 emulator written in C++.
 
+![CHIP-8 Arcade main menu](docs/images/arcade-menu.png)
+
 ## Compatibility target
 
 The original CHIP-8 interpreter for the COSMAC VIP is the baseline model.
