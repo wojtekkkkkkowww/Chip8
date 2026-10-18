@@ -29,6 +29,10 @@ std::uint8_t MonoScreen::get(std::size_t x, std::size_t y) const {
     return screen[x + y * WIDTH];
 }
 
+const std::array<std::uint8_t, MonoScreen::WIDTH * MonoScreen::HEIGHT> &MonoScreen::getPixels() const {
+    return screen;
+}
+
 std::ostream &operator<<(std::ostream &output, const MonoScreen &screen) {
     // Write the screen to the stream.
     for(std::size_t y = 0; y < MonoScreen::HEIGHT; y++) {

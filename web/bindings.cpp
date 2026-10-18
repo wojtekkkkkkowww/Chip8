@@ -2,29 +2,31 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #include <span>
+#include <cstdint>
 
 namespace {
-void loadProgram(Chip8 &chip, const emscripten::val &bytes) {
+void loadRom(Chip8 &chip, const emscripten::val &bytes) {
     const auto rom = emscripten::convertJSArrayToNumberVector<uint8_t>(bytes);
     chip.loadProgram(std::span<const uint8_t>{rom});
 }
 
-unsigned int programCounter(const Chip8 &chip) {
-    return chip.getData().programCounter;
+void runCycles(Chip8 &chip, unsigned int count) {
+    for(unsigned int cycle = 0; cycle < count; ++cycle) chip.makeStep();
 }
 
-unsigned int registerV0(const Chip8 &chip) {
-    return chip.getData().commonRegisters[0];
+emscripten::val screenPixels(const Chip8 &chip) {
+    const auto &pixels = chip.getData().screen.getPixels();
+    return emscripten::val(emscripten::typed_memory_view(pixels.size(), pixels.data()));
 }
 } // namespace
 
 EMSCRIPTEN_BINDINGS(chip8_module) {
     emscripten::class_<Chip8>("Chip8")
         .constructor<>()
-        .function("loadProgram", &loadProgram)
+        .function("loadRom", &loadRom)
         .function("makeStep", &Chip8::makeStep)
+        .function("runCycles", &runCycles)
         .function("tickTimers", &Chip8::tickTimers)
         .function("setKey", &Chip8::setKey)
-        .function("getProgramCounter", &programCounter)
-        .function("getV0", &registerV0);
+        .function("screenPixels", &screenPixels);
 }

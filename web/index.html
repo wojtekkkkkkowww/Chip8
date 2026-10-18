@@ -3,29 +3,50 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CHIP-8 — First steps</title>
+    <title>CHIP-8 Arcade</title>
     <link rel="stylesheet" href="./style.css">
     <script type="module" src="./main.js"></script>
   </head>
   <body>
     <main>
-      <p class="eyebrow">CHIP-8 · DEMO</p>
-      <h1>One instruction at a time</h1>
-      <p>The program sets V0 to zero, increments it by one, and loops back to the addition.
-        Each click executes one instruction.</p>
-      <pre aria-label="Demo program">0x200  6000  V0 = 0
-0x202  7001  V0 += 1
-0x204  1202  jump to 0x202</pre>
-      <dl>
-        <div><dt>PC · next instruction</dt><dd id="pc">—</dd></div>
-        <div><dt>Register V0</dt><dd id="v0">—</dd></div>
-        <div><dt>Executed instructions</dt><dd id="steps">0</dd></div>
-      </dl>
-      <div class="controls">
-        <button id="step" disabled>Step</button>
-        <button id="reset" class="secondary" disabled>Reset</button>
-      </div>
+      <header class="page-header">
+        <h1>CHIP-8 <span>Arcade</span></h1>
+        <p id="page-intro">Choose a game to begin.</p>
+      </header>
+
+      <section id="game-menu" aria-label="Choose a game">
+        <div id="game-list" class="game-grid"></div>
+      </section>
+
+      <section id="game-view" class="game-view" hidden>
+        <div class="game-toolbar">
+          <button id="back" class="secondary">← All games</button>
+          <div class="game-heading">
+            <h2 id="game-title"></h2>
+            <p id="game-description"></p>
+          </div>
+        </div>
+
+        <div class="arcade-cabinet">
+          <canvas id="screen" width="64" height="32" aria-label="CHIP-8 game screen"></canvas>
+          <div class="controls">
+            <button id="pause" disabled>Pause</button>
+            <button id="reset" class="secondary" disabled>Restart</button>
+          </div>
+        </div>
+
+        <section class="instructions" aria-labelledby="controls-title">
+          <h3 id="controls-title">How to play</h3>
+          <p id="game-controls"></p>
+          <p class="keypad">CHIP-8 keypad: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> /
+            <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> /
+            <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> /
+            <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd></p>
+        </section>
+      </section>
+
       <p id="status" role="status">Loading emulator…</p>
+      <footer><a href="https://github.com/JohnEarnest/chip8Archive">Games and preview art from the CC0 CHIP-8 Archive</a></footer>
     </main>
   </body>
 </html>

@@ -20,6 +20,8 @@ class MonoScreen {
     void reset(std::size_t x, std::size_t y);
 
     std::uint8_t get(std::size_t x, std::size_t y) const;
+
+    const std::array<std::uint8_t, WIDTH * HEIGHT> &getPixels() const;
 };
 
 std::ostream &operator<<(std::ostream &output, const MonoScreen &screen);

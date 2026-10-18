@@ -14,6 +14,7 @@ set_target_properties(chip8_web PROPERTIES
 )
 
 # Keep a complete, ready-to-serve page next to the generated module.
-foreach(asset index.html main.js style.css)
+foreach(asset index.html main.js games.js style.css)
     configure_file(${asset} ${asset} COPYONLY)
 endforeach()
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
