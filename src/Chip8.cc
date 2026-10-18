@@ -4,15 +4,29 @@
 #include <stdexcept>
 
 Chip8::Chip8() {
-    Font::loadInto(data.ram);
+    reset();
 }
 
-void Chip8::loadToRam(std::span<const uint8_t> rom) {
+void Chip8::loadProgram(std::span<const uint8_t> rom) {
     if(rom.size() > data.ram.size() - PROGRAM_START)
         throw std::length_error("ROM exceeds available RAM");
+    reset();
 
     std::copy(rom.begin(), rom.end(), data.ram.begin() + PROGRAM_START);
     data.programCounter = PROGRAM_START;
+}
+
+void Chip8::reset() {
+    data = ChipData{};
+    Font::loadInto(data.ram);
+    data.programCounter = PROGRAM_START;
+}
+
+void Chip8::tickTimers() {
+    if(data.timers.delay > 0)
+        --data.timers.delay;
+    if(data.timers.sound > 0)
+        --data.timers.sound;
 }
 
 void Chip8::makeStep() {

@@ -16,7 +16,7 @@ TEST(Chip8Integration, WaitForKey) {
         0xF3, 0x0A, // 0xF30A: Wait for another key release.
         0x73, 0x01  // 0x7301: Add 1 to V3 after waiting finishes.
     };
-    chip8.loadToRam(rom);
+    chip8.loadProgram(rom);
     chip8.makeStep(); // Set V3 to a sentinel value before waiting for a key.
     const auto &data = chip8.getData();
     const auto waitAddress = data.programCounter;
@@ -62,7 +62,7 @@ TEST(Chip8Integration, drawBuiltInFont) {
         0xD0, 0x15, // 0xD015: Draw five rows at (V0, V1).
         0x00, 0xE0  // 0x00E0: Clear the screen.
     };
-    chip8.loadToRam(rom);
+    chip8.loadProgram(rom);
     const auto &data = chip8.getData();
     ASSERT_TRUE(screen_test_helpers::isScreenEmpty(data.screen));
 
@@ -94,7 +94,7 @@ TEST(Chip8Integration, NestedCallsReturnToTheirCallers) {
         0x72, 0x03, // 0x20A: B adds 3 to V2.
         0x00, 0xEE  // 0x20C: Return from B to A.
     };
-    chip8.loadToRam(rom);
+    chip8.loadProgram(rom);
     const auto &data = chip8.getData();
 
     chip8.makeStep(); // Main calls A.
@@ -143,7 +143,7 @@ TEST(Chip8Integration, LoopWithConditionalSkip) {
         0x12, 0x02, // 0x206: Jump back to the increment.
         0x61, 0xAA  // 0x208: Mark that the loop has finished.
     };
-    chip8.loadToRam(rom);
+    chip8.loadProgram(rom);
 
     for(int step = 0; step < 10; ++step)
         chip8.makeStep();
@@ -175,7 +175,7 @@ TEST(Chip8Integration, SaveAndReadFromRam) {
         0xA3, 0x00, // 0x210: Reset I to 0x300.
         0xF2, 0x65  // 0x212: Restore V0-V2 from RAM.
     };
-    chip8.loadToRam(rom);
+    chip8.loadProgram(rom);
     const auto &data = chip8.getData();
 
     for(int step = 0; step < 5; ++step)

@@ -13,8 +13,12 @@ class Chip8 {
 
   public:
     Chip8();
-    void loadToRam(std::span<const uint8_t> rom);
+    void loadProgram(std::span<const uint8_t> rom);
     void makeStep();
     void setKey(uint8_t keyHex, bool pressed);
+    void tickTimers(); // Call at 60 Hz, independently of CPU instruction steps.
     const ChipData &getData() const;
+
+  private:
+    void reset();
 };
