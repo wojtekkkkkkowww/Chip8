@@ -1,4 +1,6 @@
 build/
+build-native/
+build-web/
 tags/
 .clang-format
 tags

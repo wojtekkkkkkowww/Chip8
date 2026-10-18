@@ -12,6 +12,7 @@ target_include_directories(Chip8 PUBLIC
 target_compile_features(Chip8 PUBLIC cxx_std_20)
 target_compile_options(Chip8 PRIVATE ${PROJECT_FLAGS})
 
-add_executable(runChip8 emulator.cc)
-target_compile_options(runChip8 PRIVATE ${PROJECT_FLAGS})
-target_link_libraries(runChip8 PRIVATE Chip8)
+if(EMSCRIPTEN)
+    target_compile_options(Chip8 PUBLIC -fexceptions)
+    target_link_options(Chip8 INTERFACE -fexceptions)
+endif()
